@@ -13,4 +13,6 @@ export { ErrorState } from './ErrorState';
 export { InputField } from './InputField';
 export { LoadingScreen } from './LoadingScreen';
 export { SearchBar } from './SearchBar';
+export { SegmentedControl, type SegmentOption } from './SegmentedControl';
 export { StatusBadge } from './StatusBadge';
+export { Toast } from './Toast';

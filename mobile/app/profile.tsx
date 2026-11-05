@@ -1,0 +1,156 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
+
+import { MemberSegmentedControl } from '../src/components/household';
+import { Screen } from '../src/components/layout/Screen';
+import { Avatar, CustomButton, CustomCard, SectionHeader, StatusPill } from '../src/components/ui';
+import { isClerkAuth } from '../src/features/auth/config';
+import { useSession } from '../src/features/auth/session';
+import { useHouseholdStore } from '../src/store/household';
+import { usePreferences } from '../src/store/preferences';
+import { showToast } from '../src/store/toast';
+import { useTheme } from '../src/theme';
+import { errorMessage } from '../src/utils/format';
+
+export default function ProfileScreen() {
+  const { colors, spacing, type, radius } = useTheme();
+  const { isSignedIn, claims, signOut } = useSession();
+  const { members, loadMembers, setActiveMemberId } = useHouseholdStore();
+  const linkedMemberId = usePreferences((s) => s.linkedMemberId);
+  const setLinkedMemberId = usePreferences((s) => s.setLinkedMemberId);
+  const setPromptDone = usePreferences((s) => s.setLinkedMemberPromptDone);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    void loadMembers();
+  }, [loadMembers]);
+
+  const email = claims?.email && claims.email.length > 0 ? claims.email : null;
+  const linked = members.find((m) => m.id === linkedMemberId);
+
+  function link(memberId: string) {
+    setLinkedMemberId(memberId);
+    setActiveMemberId(memberId);
+    setPromptDone(true);
+    const name = members.find((m) => m.id === memberId)?.name ?? memberId;
+    showToast(`You are ${name} in chat and the assistant.`);
+  }
+
+  function unlink() {
+    setLinkedMemberId(null);
+    showToast('Roommate identity cleared.', 'info');
+  }
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      showToast('Signed out.', 'info');
+      router.back();
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not sign out.'), 'danger');
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  return (
+    <Screen>
+      <CustomCard elevated>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <Avatar label={linked?.name ?? email ?? 'Guest'} size={56} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[type.heading, { color: colors.text }]} numberOfLines={1}>
+              {linked?.name ?? (isSignedIn ? 'Roommate not linked' : 'Guest')}
+            </Text>
+            <Text style={[type.body, { color: colors.muted, fontSize: 14 }]} numberOfLines={1}>
+              {isSignedIn
+                ? (email ?? 'Signed in')
+                : 'Sign in from Settings to set your chat identity'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+              <StatusPill
+                label={isSignedIn ? (isClerkAuth() ? 'Clerk account' : 'JWT account') : 'Guest'}
+                tone={isSignedIn ? 'primary' : 'neutral'}
+                size="sm"
+              />
+              {linked ? (
+                <StatusPill label={linked.id} tone="success" size="sm" icon="link" />
+              ) : null}
+            </View>
+          </View>
+        </View>
+      </CustomCard>
+
+      <View>
+        <SectionHeader title="Roommate identity" />
+        <CustomCard>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: spacing.sm,
+              alignItems: 'center',
+              backgroundColor: colors.primarySoft,
+              borderRadius: radius.lg,
+              padding: spacing.sm + 4,
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+            <Text style={[type.body, { color: colors.text, flex: 1, fontSize: 14 }]}>
+              This is who you are in chat and the AI assistant. The Home &ldquo;Viewing as&rdquo;
+              picker can still be changed anytime.
+            </Text>
+          </View>
+          {members.length > 0 ? (
+            <MemberSegmentedControl
+              members={members}
+              activeMemberId={linkedMemberId}
+              onSelect={link}
+            />
+          ) : (
+            <Text style={[type.body, { color: colors.muted }]}>
+              Members load from the API. Check the base URL in Settings.
+            </Text>
+          )}
+          {linkedMemberId ? (
+            <CustomButton label="Clear identity" variant="ghost" size="sm" onPress={unlink} />
+          ) : null}
+        </CustomCard>
+      </View>
+
+      <View style={{ gap: spacing.sm }}>
+        <CustomButton
+          label="Settings"
+          icon="settings-outline"
+          variant="secondary"
+          onPress={() => router.push('/settings')}
+        />
+        <CustomButton
+          label="Finance Assistant"
+          icon="sparkles-outline"
+          variant="secondary"
+          onPress={() => router.push('/assistant')}
+        />
+        {isSignedIn ? (
+          <CustomButton
+            label="Sign out"
+            icon="log-out-outline"
+            variant="danger"
+            onPress={() => void handleSignOut()}
+            loading={signingOut}
+            disabled={signingOut}
+          />
+        ) : (
+          <CustomButton
+            label="Sign in"
+            icon="log-in-outline"
+            onPress={() => router.push('/login')}
+          />
+        )}
+      </View>
+    </Screen>
+  );
+}

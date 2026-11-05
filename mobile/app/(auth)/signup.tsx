@@ -13,22 +13,45 @@ export default function SignupScreen() {
   const { signUp } = useSession();
   const clerk = isClerkAuth();
 
+  function done() {
+    router.replace('/(tabs)');
+  }
+
   return (
     <AuthShell
-      title="Create account"
-      subtitle={clerk ? 'Clerk stores credentials. Postgres stores your app profile after the first API call.' : 'Passwords are hashed on the API. This phone only stores the JWT.'}
+      eyebrow="GharSplit"
+      title="Join GharSplit"
+      subtitle="Create your account, then link yourself to Ali, Ayesha or Bilal so the assistant knows whose balance it is explaining."
       footer={
-        <Link href="/login" style={{ color: colors.primary, fontWeight: '700', fontSize: 16, textAlign: 'center' }}>
-          I already have an account
-        </Link>
+        <>
+          <Link
+            href="/login"
+            style={[type.label, { color: colors.primary, fontSize: 16, textAlign: 'center' }]}
+          >
+            I already have an account
+          </Link>
+          <Link
+            href="/(tabs)"
+            replace
+            style={[type.label, { color: colors.muted, fontSize: 15, textAlign: 'center' }]}
+          >
+            Continue as guest
+          </Link>
+        </>
       }
     >
       {clerk ? (
-        <ClerkSignUpForm onSuccess={() => router.replace('/(tabs)')} />
+        <ClerkSignUpForm onSuccess={done} />
       ) : (
         <>
           <Text style={[type.body, { color: colors.muted }]}>Use at least 8 characters.</Text>
-          <AuthForm submitLabel="Create account" onSubmit={signUp} />
+          <AuthForm
+            submitLabel="Create account"
+            onSubmit={async (email, password) => {
+              await signUp(email, password);
+              done();
+            }}
+          />
         </>
       )}
     </AuthShell>

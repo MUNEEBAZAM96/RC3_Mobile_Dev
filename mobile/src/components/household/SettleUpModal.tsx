@@ -9,6 +9,8 @@ import { settleSchema } from '../../features/household/schemas';
 import { householdApi } from '../../services/api/household';
 import { useTheme } from '../../theme';
 import type { BalanceRow, Member } from '../../types/household';
+import { pushEvent } from '../../store/activityFeed';
+import { showToast } from '../../store/toast';
 import { formatPkr } from '../../utils/currency';
 import { errorMessage } from '../../utils/format';
 import { MemberSegmentedControl } from './MemberSegmentedControl';
@@ -97,6 +99,14 @@ function SettleForm({ members, balances, preset, onSuccess, onClose }: SettleFor
   );
   const nameFor = (id: string | null) => members.find((m) => m.id === id)?.name ?? '—';
   const samePerson = senderId !== null && senderId === recipientId;
+  // min(sender's debt, recipient's credit): the largest payment the server will accept.
+  const suggested = useMemo(() => {
+    if (!senderRow || !recipientRow || samePerson) return null;
+    const debt = -senderRow.net_balance;
+    const credit = recipientRow.net_balance;
+    const value = Math.round(Math.min(debt, credit) * 100) / 100;
+    return value > 0 ? value : null;
+  }, [senderRow, recipientRow, samePerson]);
 
   async function submit() {
     if (loading) return;
@@ -114,6 +124,13 @@ function SettleForm({ members, balances, preset, onSuccess, onClose }: SettleFor
     try {
       await householdApi.settle(parsed.data);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      pushEvent({
+        type: 'settle',
+        title: `${nameFor(parsed.data.sender_id)} paid ${nameFor(parsed.data.recipient_id)}`,
+        amount: parsed.data.amount,
+        memberName: nameFor(parsed.data.sender_id),
+      });
+      showToast(`Settlement recorded. ${formatPkr(parsed.data.amount)} moved, spending unchanged.`);
       onSuccess();
       onClose();
     } catch (err) {
@@ -194,6 +211,21 @@ function SettleForm({ members, balances, preset, onSuccess, onClose }: SettleFor
         onChangeText={setAmount}
         keyboardType="decimal-pad"
         placeholder="250.00"
+        hint={
+          suggested !== null
+            ? `Clears the most possible between them: ${formatPkr(suggested)}`
+            : undefined
+        }
+      />
+      <CustomButton
+        label={suggested !== null ? `Suggest amount · ${formatPkr(suggested)}` : 'Suggest amount'}
+        icon="bulb-outline"
+        variant="ghost"
+        size="sm"
+        onPress={() => {
+          if (suggested !== null) setAmount(suggested.toFixed(2));
+        }}
+        disabled={suggested === null}
       />
 
       <Animated.View

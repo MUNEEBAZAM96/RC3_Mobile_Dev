@@ -1,3 +1,4 @@
+export { ActivityRow } from './ActivityRow';
 export { BalanceSummaryTable } from './BalanceSummaryTable';
 export { BudgetProgressBar } from './BudgetProgressBar';
 export { CategoryBreakdown } from './CategoryBreakdown';
@@ -8,3 +9,4 @@ export { SettleUpModal } from './SettleUpModal';
 export { ShoppingCheckoutSheet } from './ShoppingCheckoutSheet';
 export { ShoppingItemRow } from './ShoppingItemRow';
 export { SmartSettleCard } from './SmartSettleCard';
+export { SplitPreviewRow } from './SplitPreviewRow';

@@ -14,24 +14,47 @@ export default function LoginScreen() {
   const { signIn } = useSession();
   const clerk = isClerkAuth();
 
+  function done() {
+    router.replace('/(tabs)');
+  }
+
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle={clerk ? 'Sign in with Clerk. Passwords stay off your API.' : 'Sign in to sync with the hackathon API.'}
+      eyebrow="GharSplit"
+      title="Sign in to your flat"
+      subtitle="The ledger is shared with Ali, Ayesha and Bilal. Signing in sets who you are in chat and the AI assistant."
       footer={
-        <Link href="/signup" style={{ color: colors.primary, fontWeight: '700', fontSize: 16, textAlign: 'center' }}>
-          Create an account
-        </Link>
+        <>
+          <Link
+            href="/signup"
+            style={[type.label, { color: colors.primary, fontSize: 16, textAlign: 'center' }]}
+          >
+            New here? Join GharSplit
+          </Link>
+          <Link
+            href="/(tabs)"
+            replace
+            style={[type.label, { color: colors.muted, fontSize: 15, textAlign: 'center' }]}
+          >
+            Continue as guest
+          </Link>
+        </>
       }
     >
       {clerk ? (
-        <ClerkSignInForm onSuccess={() => router.replace('/(tabs)')} />
+        <ClerkSignInForm onSuccess={done} />
       ) : (
         <>
           <Text style={[type.body, { color: colors.muted }]}>
             Demo account {DEMO_EMAIL} / {DEMO_PASSWORD}
           </Text>
-          <AuthForm submitLabel="Sign in" onSubmit={signIn} />
+          <AuthForm
+            submitLabel="Sign in"
+            onSubmit={async (email, password) => {
+              await signIn(email, password);
+              done();
+            }}
+          />
         </>
       )}
     </AuthShell>

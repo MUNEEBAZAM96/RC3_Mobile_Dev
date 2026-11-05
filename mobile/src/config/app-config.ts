@@ -11,7 +11,7 @@ export interface AppConfig {
 }
 
 export const defaultAppConfig: AppConfig = {
-  presetId: 'fintech',
+  presetId: 'sharedLiving',
   tabVariant: 'standard',
   tabLayout: 'sharedLiving3',
 };

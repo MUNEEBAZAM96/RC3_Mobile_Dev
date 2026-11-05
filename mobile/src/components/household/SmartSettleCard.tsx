@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated';
 
 import { CustomButton, CustomCard, EmptyState, StatusPill } from '../ui';
 import { householdApi, isUnavailable } from '../../services/api/household';
+import { pushEvent } from '../../store/activityFeed';
 import { useTheme } from '../../theme';
 import type { Member, SettlementSuggestion } from '../../types/household';
 import { formatPkr } from '../../utils/currency';
@@ -65,6 +66,12 @@ export function SmartSettleCard({ members, onSettled }: SmartSettleCardProps) {
         amount: transfer.amount,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      pushEvent({
+        type: 'settle',
+        title: `${nameFor(transfer.sender_id)} paid ${nameFor(transfer.recipient_id)} · Smart Settle`,
+        amount: transfer.amount,
+        memberName: nameFor(transfer.sender_id),
+      });
       setDoneKeys((prev) => new Set(prev).add(key));
       onSettled();
     } catch (err) {

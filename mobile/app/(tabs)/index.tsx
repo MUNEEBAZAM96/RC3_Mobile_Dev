@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import {
+  ActivityRow,
   BudgetProgressBar,
   CategoryBreakdown,
   MemberSegmentedControl,
@@ -12,6 +13,7 @@ import {
 } from '../../src/components/household';
 import { enterRise } from '../../src/components/household/motion';
 import { Screen } from '../../src/components/layout/Screen';
+import { LinkRoommateModal } from '../../src/components/onboarding/LinkRoommateModal';
 import {
   CustomButton,
   CustomCard,
@@ -19,15 +21,15 @@ import {
   LoadingScreen,
   StatusPill,
 } from '../../src/components/ui';
+import { useSession } from '../../src/features/auth/session';
 import { householdApi, isUnavailable } from '../../src/services/api/household';
+import { useActivityFeed } from '../../src/store/activityFeed';
 import { useHouseholdStore } from '../../src/store/household';
+import { usePreferences } from '../../src/store/preferences';
 import { useTheme } from '../../src/theme';
 import type { BalanceRow, BudgetSummary, CategorySpending } from '../../src/types/household';
-import { errorMessage } from '../../src/utils/format';
-
-function monthLabel(date = new Date()): string {
-  return date.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' });
-}
+import { errorMessage, initials } from '../../src/utils/format';
+import { monthLabel } from '../../src/utils/time';
 
 function greeting(date = new Date()): string {
   const h = date.getHours();
@@ -40,6 +42,10 @@ export default function HomeScreen() {
   const { colors, spacing, type, minTapTarget, radius } = useTheme();
   const { members, activeMemberId, setActiveMemberId, loadMembers, membersError } =
     useHouseholdStore();
+  const { isSignedIn } = useSession();
+  const linkedMemberId = usePreferences((s) => s.linkedMemberId);
+  const linkedMemberPromptDone = usePreferences((s) => s.linkedMemberPromptDone);
+  const events = useActivityFeed((s) => s.events);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +107,13 @@ export default function HomeScreen() {
     () => balances.find((b) => b.member_id === activeMemberId),
     [balances, activeMemberId],
   );
+  const linkedMember = useMemo(
+    () => members.find((m) => m.id === linkedMemberId),
+    [members, linkedMemberId],
+  );
+  const recentEvents = useMemo(() => events.slice(0, 3), [events]);
+  const showLinkPrompt =
+    isSignedIn && !linkedMemberId && !linkedMemberPromptDone && members.length > 0 && !loading;
 
   async function applyRecurring() {
     if (recurringBusy) return;
@@ -148,13 +161,43 @@ export default function HomeScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={[type.caption, { color: colors.muted }]}>
-            {greeting().toUpperCase()} · LAHORE
+            {greeting().toUpperCase()}
+            {linkedMember ? `, ${linkedMember.name.toUpperCase()}` : ''} ·{' '}
+            {monthLabel().toUpperCase()}
           </Text>
           <Text accessibilityRole="header" style={[type.title, { color: colors.text }]}>
-            Shared Living
+            GharSplit
           </Text>
-          <Text style={[type.body, { color: colors.muted }]}>{monthLabel()}</Text>
+          <Text style={[type.body, { color: colors.muted }]}>Shared flat · Lahore</Text>
         </View>
+        <Pressable
+          onPress={() => router.push(isSignedIn ? '/profile' : '/settings')}
+          accessibilityRole="button"
+          accessibilityLabel={isSignedIn ? 'Profile' : 'Sign in'}
+          style={({ pressed }) => ({
+            minHeight: minTapTarget,
+            minWidth: minTapTarget,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: radius.full,
+            backgroundColor: isSignedIn ? colors.primarySoft : colors.card,
+            borderWidth: 1,
+            borderColor: isSignedIn ? colors.primary : colors.border,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          {linkedMember ? (
+            <Text style={[type.label, { color: colors.primary }]}>
+              {initials(linkedMember.name)}
+            </Text>
+          ) : (
+            <Ionicons
+              name={isSignedIn ? 'person' : 'person-outline'}
+              size={20}
+              color={isSignedIn ? colors.primary : colors.text}
+            />
+          )}
+        </Pressable>
         <Pressable
           onPress={() => router.push('/settings')}
           accessibilityRole="button"
@@ -185,7 +228,23 @@ export default function HomeScreen() {
       {/* Viewing as */}
       {members.length > 0 ? (
         <Animated.View entering={enterRise(0)} style={{ gap: spacing.sm }}>
-          <Text style={[type.label, { color: colors.muted }]}>Viewing as</Text>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Text style={[type.label, { color: colors.muted }]}>Viewing as</Text>
+            {linkedMember && linkedMember.id !== activeMemberId ? (
+              <Pressable
+                onPress={() => setActiveMemberId(linkedMember.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Back to ${linkedMember.name}`}
+                hitSlop={8}
+              >
+                <Text style={[type.caption, { color: colors.primary }]}>
+                  Back to me ({linkedMember.name})
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <MemberSegmentedControl
             members={members}
             activeMemberId={activeMemberId}
@@ -207,6 +266,60 @@ export default function HomeScreen() {
           </CustomCard>
         </Animated.View>
       ) : null}
+
+      {/* Quick actions */}
+      <Animated.View entering={enterRise(3)} style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <QuickAction
+          icon="sparkles"
+          title="Finance Assistant"
+          body="Ask GharSplit AI about balances"
+          onPress={() => router.push('/assistant')}
+          accent
+        />
+        <QuickAction
+          icon="pulse-outline"
+          title="Flat feed"
+          body={
+            recentEvents.length > 0
+              ? `${events.length} recent event${events.length === 1 ? '' : 's'}`
+              : 'Activity timeline'
+          }
+          onPress={() => router.push('/household-feed')}
+        />
+      </Animated.View>
+
+      {/* Recent activity */}
+      <Animated.View entering={enterRise(3)}>
+        <CustomCard>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Text style={[type.heading, { color: colors.text, fontSize: 18 }]}>
+              Recent activity
+            </Text>
+            <Pressable
+              onPress={() => router.push('/household-feed')}
+              accessibilityRole="button"
+              accessibilityLabel="See all activity"
+              hitSlop={8}
+              style={{ minHeight: 32, justifyContent: 'center' }}
+            >
+              <Text style={[type.label, { color: colors.primary }]}>See all</Text>
+            </Pressable>
+          </View>
+          {recentEvents.length === 0 ? (
+            <Text style={[type.body, { color: colors.muted, fontSize: 14 }]}>
+              Checkouts, bills and settlements you log on this phone show up here.
+            </Text>
+          ) : (
+            <View style={{ gap: spacing.sm }}>
+              {recentEvents.map((event) => (
+                <ActivityRow key={event.id} event={event} compact />
+              ))}
+            </View>
+          )}
+        </CustomCard>
+      </Animated.View>
 
       {/* Quick row: shopping + recurring */}
       <Animated.View entering={enterRise(3)} style={{ gap: spacing.md }}>
@@ -304,6 +417,66 @@ export default function HomeScreen() {
           <CategoryBreakdown categories={categories} monthlyBudget={budget?.monthly_budget ?? 0} />
         </Animated.View>
       )}
+
+      <LinkRoommateModal
+        visible={showLinkPrompt}
+        members={members}
+        onClose={() => usePreferences.getState().setLinkedMemberPromptDone(true)}
+      />
     </Screen>
+  );
+}
+
+function QuickAction({
+  icon,
+  title,
+  body,
+  onPress,
+  accent,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+  onPress: () => void;
+  accent?: boolean;
+}) {
+  const { colors, spacing, type, radius } = useTheme();
+  return (
+    <CustomCard
+      onPress={onPress}
+      accessibilityLabel={title}
+      tone={accent ? 'hero' : 'default'}
+      style={{ flex: 1 }}
+    >
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: radius.md,
+          backgroundColor: accent ? 'rgba(255,255,255,0.14)' : colors.primarySoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name={icon} size={18} color={accent ? colors.heroText : colors.primary} />
+      </View>
+      <View style={{ gap: 2, marginTop: spacing.xs }}>
+        <Text
+          style={[type.label, { color: accent ? colors.heroText : colors.text, fontSize: 15 }]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        <Text
+          style={[
+            type.caption,
+            { color: accent ? colors.heroText : colors.muted, opacity: accent ? 0.85 : 1 },
+          ]}
+          numberOfLines={2}
+        >
+          {body}
+        </Text>
+      </View>
+    </CustomCard>
   );
 }

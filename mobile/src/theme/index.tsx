@@ -38,7 +38,7 @@ export function ThemeProvider({ children, fontsLoaded }: ThemeProviderProps) {
   const { presetId, colorMode } = useUiConfig();
 
   const mode = colorMode === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : colorMode;
-  const preset = themePresets[presetId] ?? themePresets.fintech;
+  const preset = themePresets[presetId] ?? themePresets.sharedLiving ?? themePresets.fintech;
 
   const value = useMemo<AppTheme>(
     () => ({

@@ -6,14 +6,31 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ShoppingCheckoutSheet, ShoppingItemRow } from '../../src/components/household';
-import { enterFade, enterRise, exitFade, layoutSpring } from '../../src/components/household/motion';
+import {
+  enterFade,
+  enterRise,
+  exitFade,
+  layoutSpring,
+} from '../../src/components/household/motion';
 import { Screen } from '../../src/components/layout/Screen';
-import { AppHeader, CustomButton, CustomCard, EmptyState, ErrorState, InputField, LoadingScreen, SectionHeader, StatusPill } from '../../src/components/ui';
+import {
+  AppHeader,
+  CustomButton,
+  CustomCard,
+  EmptyState,
+  ErrorState,
+  InputField,
+  LoadingScreen,
+  SectionHeader,
+  StatusPill,
+} from '../../src/components/ui';
 import { createShoppingItemSchema } from '../../src/features/household/schemas';
 import { householdApi } from '../../src/services/api/household';
 import { useHouseholdStore } from '../../src/store/household';
 import { useTheme } from '../../src/theme';
 import { SHOPPING_UNITS, type ShoppingItem, type ShoppingUnit } from '../../src/types/household';
+import { pushEvent } from '../../src/store/activityFeed';
+import { showToast } from '../../src/store/toast';
 import { errorMessage } from '../../src/utils/format';
 
 const UNIT_ICON: Record<ShoppingUnit, keyof typeof Ionicons.glyphMap> = {
@@ -54,7 +71,9 @@ export default function ShoppingScreen() {
       const list = await householdApi.getShopping();
       setItems(list);
       // Drop selections for items that are no longer pending.
-      setSelectedIds((prev) => prev.filter((id) => list.some((i) => i.id === id && i.status === 'pending')));
+      setSelectedIds((prev) =>
+        prev.filter((id) => list.some((i) => i.id === id && i.status === 'pending')),
+      );
     } catch (err) {
       setError(errorMessage(err, 'Could not load shopping list.'));
     } finally {
@@ -87,7 +106,12 @@ export default function ShoppingScreen() {
     setAdding(true);
     setFormError(null);
     try {
-      await householdApi.createShoppingItem(parsed.data);
+      const created = await householdApi.createShoppingItem(parsed.data);
+      pushEvent({
+        type: 'shopping_added',
+        title: `${created.title || parsed.data.title} added · ${parsed.data.requested_qty} ${parsed.data.unit}`,
+      });
+      showToast(`${created.title || parsed.data.title} added to the list.`, 'info');
       setTitle('');
       setQty(1);
       await load();
@@ -118,7 +142,16 @@ export default function ShoppingScreen() {
           title="Shopping"
           subtitle={`${pending.length} pending · ${bought.length} bought`}
           right={
-            <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: radius.full,
+                backgroundColor: colors.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Ionicons name="cart" size={22} color={colors.primary} />
             </View>
           }
@@ -129,7 +162,14 @@ export default function ShoppingScreen() {
         <Animated.View entering={enterRise(0)}>
           <CustomCard>
             <SectionHeader title="Add to list" />
-            <InputField label="Item" value={title} onChangeText={setTitle} placeholder="Milk, rice, dish soap…" returnKeyType="done" onSubmitEditing={() => void addItem()} />
+            <InputField
+              label="Item"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Milk, rice, dish soap…"
+              returnKeyType="done"
+              onSubmitEditing={() => void addItem()}
+            />
             <View style={{ gap: spacing.xs }}>
               <Text style={[type.label, { color: colors.text }]}>Unit</Text>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
@@ -155,8 +195,16 @@ export default function ShoppingScreen() {
                         opacity: pressed ? 0.85 : 1,
                       })}
                     >
-                      <Ionicons name={UNIT_ICON[u]} size={16} color={active ? colors.primary : colors.muted} />
-                      <Text style={[type.caption, { color: active ? colors.primary : colors.text }]}>{u}</Text>
+                      <Ionicons
+                        name={UNIT_ICON[u]}
+                        size={16}
+                        color={active ? colors.primary : colors.muted}
+                      />
+                      <Text
+                        style={[type.caption, { color: active ? colors.primary : colors.text }]}
+                      >
+                        {u}
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -166,18 +214,58 @@ export default function ShoppingScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
               <View style={{ gap: spacing.xs }}>
                 <Text style={[type.label, { color: colors.text }]}>Quantity</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.card }}>
-                  <Stepper icon="remove" label="Decrease quantity" disabled={qty <= 1} onPress={() => setQty((q) => Math.max(1, q - 1))} />
-                  <Text style={[type.heading, { color: colors.text, minWidth: 36, textAlign: 'center', fontSize: 18 }]}>{qty}</Text>
-                  <Stepper icon="add" label="Increase quantity" onPress={() => setQty((q) => Math.min(99, q + 1))} />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: radius.md,
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <Stepper
+                    icon="remove"
+                    label="Decrease quantity"
+                    disabled={qty <= 1}
+                    onPress={() => setQty((q) => Math.max(1, q - 1))}
+                  />
+                  <Text
+                    style={[
+                      type.heading,
+                      { color: colors.text, minWidth: 36, textAlign: 'center', fontSize: 18 },
+                    ]}
+                  >
+                    {qty}
+                  </Text>
+                  <Stepper
+                    icon="add"
+                    label="Increase quantity"
+                    onPress={() => setQty((q) => Math.min(99, q + 1))}
+                  />
                 </View>
               </View>
               <View style={{ flex: 1 }}>
-                <CustomButton label="Add to list" icon="add" onPress={() => void addItem()} loading={adding} disabled={adding} />
+                <CustomButton
+                  label="Add to list"
+                  icon="add"
+                  onPress={() => void addItem()}
+                  loading={adding}
+                  disabled={adding}
+                />
               </View>
             </View>
             {formError ? (
-              <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center', backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: spacing.sm + 2 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: spacing.sm,
+                  alignItems: 'center',
+                  backgroundColor: colors.dangerSoft,
+                  borderRadius: radius.md,
+                  padding: spacing.sm + 2,
+                }}
+              >
                 <Ionicons name="alert-circle" size={18} color={colors.danger} />
                 <Text style={[type.label, { color: colors.danger, flex: 1 }]}>{formError}</Text>
               </View>
@@ -187,16 +275,34 @@ export default function ShoppingScreen() {
 
         {/* Pending */}
         <View>
-          <SectionHeader title={`Pending${pending.length ? ` · ${pending.length}` : ''}`} actionLabel={pending.length > 1 ? (allSelected ? 'Clear' : 'Select all') : undefined} onAction={pending.length > 1 ? toggleAll : undefined} />
+          <SectionHeader
+            title={`Pending${pending.length ? ` · ${pending.length}` : ''}`}
+            actionLabel={pending.length > 1 ? (allSelected ? 'Clear' : 'Select all') : undefined}
+            onAction={pending.length > 1 ? toggleAll : undefined}
+          />
           {pending.length === 0 ? (
             <CustomCard>
-              <EmptyState icon="basket-outline" title="The list is clear" message="Add milk, rice or anything the flat needs. Select items when someone buys them to post a shared expense." />
+              <EmptyState
+                icon="basket-outline"
+                title="The list is clear"
+                message="Add milk, rice or anything the flat needs. Select items when someone buys them to post a shared expense."
+              />
             </CustomCard>
           ) : (
             <View style={{ gap: spacing.sm }}>
               {pending.map((item, index) => (
-                <Animated.View key={item.id} entering={enterRise(index)} exiting={exitFade} layout={layoutSpring}>
-                  <ShoppingItemRow item={item} selectable selected={selectedIds.includes(item.id)} onToggleSelect={() => toggleSelect(item.id)} />
+                <Animated.View
+                  key={item.id}
+                  entering={enterRise(index)}
+                  exiting={exitFade}
+                  layout={layoutSpring}
+                >
+                  <ShoppingItemRow
+                    item={item}
+                    selectable
+                    selected={selectedIds.includes(item.id)}
+                    onToggleSelect={() => toggleSelect(item.id)}
+                  />
                 </Animated.View>
               ))}
             </View>
@@ -211,11 +317,22 @@ export default function ShoppingScreen() {
               accessibilityRole="button"
               accessibilityState={{ expanded: showBought }}
               accessibilityLabel={`Bought items, ${bought.length}`}
-              style={{ flexDirection: 'row', alignItems: 'center', minHeight: minTapTarget, gap: spacing.sm }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                minHeight: minTapTarget,
+                gap: spacing.sm,
+              }}
             >
-              <Text style={[type.heading, { color: colors.text, fontSize: 18, flex: 1 }]}>Bought</Text>
+              <Text style={[type.heading, { color: colors.text, fontSize: 18, flex: 1 }]}>
+                Bought
+              </Text>
               <StatusPill label={String(bought.length)} tone="success" size="sm" />
-              <Ionicons name={showBought ? 'chevron-up' : 'chevron-down'} size={20} color={colors.muted} />
+              <Ionicons
+                name={showBought ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={colors.muted}
+              />
             </Pressable>
             {showBought ? (
               <Animated.View entering={enterFade} style={{ gap: spacing.sm }}>
@@ -252,7 +369,9 @@ export default function ShoppingScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[type.caption, { color: colors.muted }]}>SELECTED</Text>
             <Text style={[type.label, { color: colors.text, fontSize: 15 }]}>
-              {selectedIds.length === 0 ? 'Tap items to select' : `${selectedIds.length} of ${pending.length} item${pending.length === 1 ? '' : 's'}`}
+              {selectedIds.length === 0
+                ? 'Tap items to select'
+                : `${selectedIds.length} of ${pending.length} item${pending.length === 1 ? '' : 's'}`}
             </Text>
           </View>
           <CustomButton
@@ -280,7 +399,17 @@ export default function ShoppingScreen() {
   );
 }
 
-function Stepper({ icon, label, onPress, disabled }: { icon: 'add' | 'remove'; label: string; onPress: () => void; disabled?: boolean }) {
+function Stepper({
+  icon,
+  label,
+  onPress,
+  disabled,
+}: {
+  icon: 'add' | 'remove';
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   const { colors, minTapTarget } = useTheme();
   return (
     <Pressable
@@ -289,7 +418,13 @@ function Stepper({ icon, label, onPress, disabled }: { icon: 'add' | 'remove'; l
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={({ pressed }) => ({ width: minTapTarget, height: minTapTarget - 2, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({
+        width: minTapTarget,
+        height: minTapTarget - 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: disabled ? 0.35 : pressed ? 0.6 : 1,
+      })}
     >
       <Ionicons name={icon} size={20} color={colors.primary} />
     </Pressable>

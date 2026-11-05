@@ -4,10 +4,22 @@ import { useCallback, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BalanceSummaryTable, ExpenseForm, SettleUpModal, SmartSettleCard } from '../../src/components/household';
-import { enterFade, enterRise, exitFade } from '../../src/components/household/motion';
+import {
+  BalanceSummaryTable,
+  ExpenseForm,
+  SettleUpModal,
+  SmartSettleCard,
+} from '../../src/components/household';
+import { enterRise } from '../../src/components/household/motion';
 import { Screen } from '../../src/components/layout/Screen';
-import { AppHeader, CustomButton, CustomCard, ErrorState, LoadingScreen, SectionHeader } from '../../src/components/ui';
+import {
+  AppHeader,
+  CustomButton,
+  CustomCard,
+  ErrorState,
+  LoadingScreen,
+  SectionHeader,
+} from '../../src/components/ui';
 import { householdApi } from '../../src/services/api/household';
 import { useHouseholdStore } from '../../src/store/household';
 import { useTheme } from '../../src/theme';
@@ -23,7 +35,6 @@ export default function ExpensesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settleOpen, setSettleOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -44,13 +55,14 @@ export default function ExpensesScreen() {
     }, [load]),
   );
 
-  const flash = useCallback((message: string) => {
-    setToast(message);
-    setTimeout(() => setToast((current) => (current === message ? null : current)), 2800);
-  }, []);
-
-  const totalSpending = useMemo(() => balances.reduce((sum, row) => sum + row.total_paid, 0), [balances]);
-  const openDebts = useMemo(() => balances.filter((b) => b.net_balance < -0.004).length, [balances]);
+  const totalSpending = useMemo(
+    () => balances.reduce((sum, row) => sum + row.total_paid, 0),
+    [balances],
+  );
+  const openDebts = useMemo(
+    () => balances.filter((b) => b.net_balance < -0.004).length,
+    [balances],
+  );
   const allSettled = balances.length > 0 && openDebts === 0;
 
   if (loading && balances.length === 0) {
@@ -70,35 +82,45 @@ export default function ExpensesScreen() {
           title="Expenses"
           subtitle="Log bills, see who owes whom, settle up"
           right={
-            <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: radius.full,
+                backgroundColor: colors.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Ionicons name="wallet" size={22} color={colors.primary} />
             </View>
           }
         />
         {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-        {toast ? (
-          <Animated.View
-            entering={enterFade}
-            exiting={exitFade}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.successSoft, borderRadius: radius.lg, padding: spacing.sm + 4 }}
-          >
-            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-            <Text style={[type.label, { color: colors.success, flex: 1 }]}>{toast}</Text>
-          </Animated.View>
-        ) : null}
-
         {/* Summary strip */}
         <Animated.View entering={enterRise(0)} style={{ flexDirection: 'row', gap: spacing.sm }}>
           <CustomCard style={{ flex: 1 }}>
             <Text style={[type.caption, { color: colors.muted }]}>TOTAL SPENT</Text>
-            <Text style={[type.heading, { color: colors.text, fontSize: 18 }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text
+              style={[type.heading, { color: colors.text, fontSize: 18 }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {formatPkr(totalSpending)}
             </Text>
           </CustomCard>
           <CustomCard style={{ flex: 1 }} tone={allSettled ? 'soft' : 'default'}>
             <Text style={[type.caption, { color: colors.muted }]}>OPEN DEBTS</Text>
-            <Text style={[type.heading, { color: allSettled ? colors.success : openDebts > 0 ? colors.danger : colors.text, fontSize: 18 }]}>
+            <Text
+              style={[
+                type.heading,
+                {
+                  color: allSettled ? colors.success : openDebts > 0 ? colors.danger : colors.text,
+                  fontSize: 18,
+                },
+              ]}
+            >
               {allSettled ? 'All square' : `${openDebts} member${openDebts === 1 ? '' : 's'}`}
             </Text>
           </CustomCard>
@@ -107,32 +129,29 @@ export default function ExpensesScreen() {
         {/* Ledger */}
         <Animated.View entering={enterRise(1)} style={{ gap: spacing.sm }}>
           <SectionHeader title="Household balances" />
-          <BalanceSummaryTable balances={balances} members={members} activeMemberId={activeMemberId} />
-          <CustomButton label="Settle up" icon="swap-horizontal" onPress={() => setSettleOpen(true)} disabled={members.length < 2} />
+          <BalanceSummaryTable
+            balances={balances}
+            members={members}
+            activeMemberId={activeMemberId}
+          />
+          <CustomButton
+            label="Settle up"
+            icon="swap-horizontal"
+            onPress={() => setSettleOpen(true)}
+            disabled={members.length < 2}
+          />
         </Animated.View>
 
         {/* Hour 3.5 (Option 1) */}
         <Animated.View entering={enterRise(2)}>
-          <SmartSettleCard
-            members={members}
-            onSettled={() => {
-              flash('Settlement recorded. Balances updated.');
-              void load();
-            }}
-          />
+          <SmartSettleCard members={members} onSettled={() => void load()} />
         </Animated.View>
 
         {/* Log expense */}
         <Animated.View entering={enterRise(3)}>
           <CustomCard>
             <SectionHeader title="Log shared expense" />
-            <ExpenseForm
-              members={members}
-              onSuccess={() => {
-                flash('Expense saved and split.');
-                void load();
-              }}
-            />
+            <ExpenseForm members={members} onSuccess={() => void load()} />
           </CustomCard>
         </Animated.View>
       </Screen>
@@ -142,10 +161,7 @@ export default function ExpensesScreen() {
         onClose={() => setSettleOpen(false)}
         members={members}
         balances={balances}
-        onSuccess={() => {
-          flash('Payment recorded.');
-          void load();
-        }}
+        onSuccess={() => void load()}
       />
     </>
   );

@@ -7,12 +7,17 @@ import Animated from 'react-native-reanimated';
 import { CustomButton, InputField, StatusPill } from '../ui';
 import { expenseSchema } from '../../features/household/schemas';
 import { householdApi } from '../../services/api/household';
+import { pushEvent } from '../../store/activityFeed';
+import { showToast } from '../../store/toast';
 import { useTheme } from '../../theme';
 import { EXPENSE_CATEGORIES, type Member, type SplitType } from '../../types/household';
 import { formatPkr } from '../../utils/currency';
 import { errorMessage } from '../../utils/format';
+import { previewEqualSplit } from '../../utils/splitPreview';
+import { todayIso } from '../../utils/time';
 import { MemberSegmentedControl, MemberToggleChips } from './MemberSegmentedControl';
 import { enterFade, layoutSpring } from './motion';
+import { SplitPreviewRow } from './SplitPreviewRow';
 
 interface ExpenseFormProps {
   members: Member[];
@@ -25,12 +30,6 @@ const CATEGORY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   Entertainment: 'game-controller-outline',
   Cleaning: 'sparkles-outline',
 };
-
-function todayIso(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
   const { colors, spacing, type, radius, minTapTarget } = useTheme();
@@ -69,6 +68,13 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
     Number.isFinite(amountNumber) && amount.trim() !== ''
       ? Math.round((amountNumber - assigned) * 100) / 100
       : null;
+  const equalPreview = useMemo(
+    () =>
+      splitType === 'equal' && Number.isFinite(amountNumber) && amountNumber > 0
+        ? previewEqualSplit(amountNumber, equalMemberIds)
+        : [],
+    [splitType, amountNumber, equalMemberIds],
+  );
 
   function toggleEqualMember(id: string) {
     setEqualMemberIds(
@@ -130,6 +136,16 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
         ...(data.is_recurring ? { is_recurring: true } : {}),
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const payerName = members.find((m) => m.id === data.payer_id)?.name;
+      pushEvent({
+        type: 'expense',
+        title: `${data.title} · ${data.category}${data.is_recurring ? ' · monthly' : ''}`,
+        amount: data.amount,
+        memberName: payerName,
+      });
+      showToast(
+        `Saved. ${formatPkr(data.amount)} split ${data.split_type === 'equal' ? 'equally' : 'by custom shares'}.`,
+      );
       resetForm();
       onSuccess();
     } catch (err) {
@@ -273,11 +289,15 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
                 onToggle={toggleEqualMember}
                 compact
               />
-              <Text style={[type.caption, { color: colors.muted }]}>
-                {equalMemberIds.length > 0
-                  ? `Shared equally across ${equalMemberIds.length}. Leftover paisa goes to the lowest member ID first.`
-                  : 'Select at least one member.'}
-              </Text>
+              {equalPreview.length > 0 ? (
+                <SplitPreviewRow shares={equalPreview} members={members} payerId={payerId} />
+              ) : (
+                <Text style={[type.caption, { color: colors.muted }]}>
+                  {equalMemberIds.length > 0
+                    ? `Shared equally across ${equalMemberIds.length}. Leftover paisa goes to the lowest member ID first.`
+                    : 'Select at least one member.'}
+                </Text>
+              )}
             </>
           ) : (
             <>

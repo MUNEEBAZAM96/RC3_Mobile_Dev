@@ -7,12 +7,16 @@ import Animated from 'react-native-reanimated';
 import { BottomSheet, CustomButton, InputField } from '../ui';
 import { checkoutSchema } from '../../features/household/schemas';
 import { householdApi } from '../../services/api/household';
+import { pushEvent } from '../../store/activityFeed';
+import { showToast } from '../../store/toast';
 import { useTheme } from '../../theme';
 import type { CheckoutPayload, Member, ShoppingItem } from '../../types/household';
 import { formatPkr } from '../../utils/currency';
 import { errorMessage } from '../../utils/format';
+import { previewCheckoutTotal, previewEqualSplit } from '../../utils/splitPreview';
 import { MemberSegmentedControl, MemberToggleChips } from './MemberSegmentedControl';
 import { enterFade, layoutSpring } from './motion';
+import { SplitPreviewRow } from './SplitPreviewRow';
 
 interface ShoppingCheckoutSheetProps {
   visible: boolean;
@@ -85,7 +89,10 @@ function CheckoutForm({ members, selectedItemIds, items, onSuccess, onClose }: C
   const off = parseAmount(discount);
   const hasAdjustments = (tax !== null && tax > 0) || (off !== null && off > 0);
   const finalTotal =
-    itemsTotal === null ? null : Math.max(0, itemsTotal * (1 + (tax ?? 0) / 100) - (off ?? 0));
+    itemsTotal === null ? null : previewCheckoutTotal(itemsTotal, tax ?? 0, off ?? 0);
+  const splitPreview =
+    finalTotal !== null && finalTotal > 0 ? previewEqualSplit(finalTotal, splitMemberIds) : [];
+  const payerName = members.find((m) => m.id === payerId)?.name ?? 'Someone';
 
   function toggleSplitMember(id: string) {
     setSplitMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -120,6 +127,20 @@ function CheckoutForm({ members, selectedItemIds, items, onSuccess, onClose }: C
         payload.discount_amount = parsed.data.discount_amount;
       await householdApi.checkout(payload);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const posted = finalTotal ?? parsed.data.total_paid;
+      const firstTitle = selectedItems[0]?.title;
+      pushEvent({
+        type: 'checkout',
+        title:
+          selectedItems.length > 1 && firstTitle
+            ? `Shopping trip · ${firstTitle} +${selectedItems.length - 1} more`
+            : `Shopping trip${firstTitle ? ` · ${firstTitle}` : ''}`,
+        amount: posted,
+        memberName: payerName,
+      });
+      showToast(
+        `Checkout complete. ${formatPkr(posted)} split across ${parsed.data.split_members.length}.`,
+      );
       onSuccess();
       onClose();
     } catch (err) {
@@ -204,6 +225,9 @@ function CheckoutForm({ members, selectedItemIds, items, onSuccess, onClose }: C
           <Text style={[type.caption, { color: colors.danger }]}>
             Select at least one member for the split.
           </Text>
+        ) : null}
+        {splitPreview.length > 0 ? (
+          <SplitPreviewRow shares={splitPreview} members={members} payerId={payerId} />
         ) : null}
       </View>
 
