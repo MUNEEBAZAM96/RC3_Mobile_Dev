@@ -4,7 +4,14 @@ import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActivityRow } from '../src/components/household';
-import { CustomButton, CustomCard, EmptyState, StatusPill } from '../src/components/ui';
+import { useRefreshOverlayVisible } from '../src/hooks/useRefreshOverlayVisible';
+import {
+  CustomButton,
+  CustomCard,
+  EmptyState,
+  RefreshSplashOverlay,
+  StatusPill,
+} from '../src/components/ui';
 import { useActivityFeed, type ActivityEvent } from '../src/store/activityFeed';
 import { useTheme } from '../src/theme';
 
@@ -14,6 +21,8 @@ export default function HouseholdFeedScreen() {
   const events = useActivityFeed((s) => s.events);
   const [refreshing, setRefreshing] = useState(false);
   const [tick, setTick] = useState(0);
+
+  const overlayVisible = useRefreshOverlayVisible(refreshing);
 
   const refresh = useCallback(() => {
     setRefreshing(true);
@@ -33,7 +42,9 @@ export default function HouseholdFeedScreen() {
   );
 
   return (
-    <FlatList
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <RefreshSplashOverlay visible={overlayVisible} />
+      <FlatList
       data={events}
       extraData={tick}
       keyExtractor={(item) => item.id}
@@ -103,5 +114,6 @@ export default function HouseholdFeedScreen() {
         </View>
       }
     />
+    </View>
   );
 }

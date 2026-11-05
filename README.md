@@ -31,6 +31,8 @@ Legacy JWT demo (no Clerk): set `EXPO_PUBLIC_AUTH_PROVIDER=jwt` in `mobile/.env`
 
 The API seeds that user in memory on boot in JWT mode only.
 
+**Demo data:** repeatable household benchmark presets — see [docs/benchmark-seed.md](docs/benchmark-seed.md).
+
 ## Run the API
 
 ```bash

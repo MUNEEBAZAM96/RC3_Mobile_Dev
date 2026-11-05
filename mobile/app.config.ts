@@ -43,7 +43,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           recordAudioAndroid: true,
         },
       ],
-      ['expo-image-picker', { photosPermission: 'The camera lab lets you pick a photo.' }],
+      [
+        'expo-image-picker',
+        {
+          photosPermission:
+            'GharSplit lets you attach payment proof photos from your gallery when logging shared expenses.',
+          cameraPermission:
+            'GharSplit uses the camera to capture payment proof when you log a shared expense.',
+        },
+      ],
       ['expo-location', { locationWhenInUsePermission: 'The location lab shows where you are.' }],
       'expo-notifications',
       ['expo-build-properties', { android: { usesCleartextTraffic: true } }],

@@ -4,7 +4,18 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BottomSheet, CustomButton, InputField } from '../ui';
+import {
+  AmountChipRow,
+  BottomSheet,
+  CustomButton,
+  InputField,
+  QuickChipRow,
+} from '../ui';
+import {
+  CHECKOUT_AMOUNT_CHIPS,
+  DISCOUNT_CHIPS,
+  TAX_PERCENT_CHIPS,
+} from '../../features/household/presets';
 import { checkoutSchema } from '../../features/household/schemas';
 import { householdApi } from '../../services/api/household';
 import { pushEvent } from '../../store/activityFeed';
@@ -202,6 +213,12 @@ function CheckoutForm({ members, selectedItemIds, items, onSuccess, onClose }: C
             : undefined
         }
       />
+      <AmountChipRow
+        label="Trip totals"
+        amounts={CHECKOUT_AMOUNT_CHIPS}
+        onSelect={(n) => setTotalPaid(String(n))}
+        selectedAmount={parseAmount(totalPaid)}
+      />
 
       <View style={{ gap: spacing.sm }}>
         <Text style={[type.label, { color: colors.text }]}>Paid by</Text>
@@ -215,6 +232,16 @@ function CheckoutForm({ members, selectedItemIds, items, onSuccess, onClose }: C
 
       <View style={{ gap: spacing.sm }}>
         <Text style={[type.label, { color: colors.text }]}>Split between</Text>
+        <QuickChipRow
+          options={[
+            {
+              id: 'all',
+              label: 'Everyone',
+              icon: 'people-outline',
+            },
+          ]}
+          onSelect={() => setSplitMemberIds(members.map((m) => m.id))}
+        />
         <MemberToggleChips
           members={members}
           selectedIds={splitMemberIds}
@@ -274,6 +301,26 @@ function CheckoutForm({ members, selectedItemIds, items, onSuccess, onClose }: C
             entering={enterFade}
             style={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
           >
+            <QuickChipRow
+              label="Tax (GST)"
+              options={TAX_PERCENT_CHIPS.map((p) => ({
+                id: String(p),
+                label: p === 0 ? 'No tax' : `${p}%`,
+                icon: 'receipt-outline',
+              }))}
+              selectedId={taxPercent.trim() === '' ? '0' : taxPercent}
+              onSelect={(id) => setTaxPercent(id === '0' ? '' : id)}
+            />
+            <QuickChipRow
+              label="Discount"
+              options={DISCOUNT_CHIPS.map((d) => ({
+                id: String(d),
+                label: d === 0 ? 'None' : `−${d}`,
+                icon: 'pricetag-outline',
+              }))}
+              selectedId={discount.trim() === '' ? '0' : discount}
+              onSelect={(id) => setDiscount(id === '0' ? '' : id)}
+            />
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <View style={{ flex: 1 }}>
                 <InputField

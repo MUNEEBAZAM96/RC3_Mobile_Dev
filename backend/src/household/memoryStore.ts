@@ -3,8 +3,16 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from '../http/errors';
 import { roundPkr } from './money';
 import { splitEqual } from './split';
+import {
+  applyMemberUpdate,
+  assertUniqueMemberName,
+  findMember,
+  normalizeMemberName,
+  prepareCreateMember,
+} from './members';
 import { DEFAULT_MEMBERS, DEFAULT_MONTHLY_BUDGET } from './seed';
 import type {
+  CreateMemberInput,
   ExpenseRecord,
   ExpenseSplitRecord,
   HouseholdStore,
@@ -13,6 +21,7 @@ import type {
   ShoppingStatus,
   ShoppingUnit,
   SplitShare,
+  UpdateMemberInput,
 } from './types';
 
 export function createMemoryHouseholdStore(): HouseholdStore {
@@ -42,7 +51,7 @@ export function createMemoryHouseholdStore(): HouseholdStore {
     split_type: 'equal' | 'custom';
     expense_date: string;
     shares: SplitShare[];
-  }): void {
+  }): ExpenseRecord {
     assertMembers([input.payer_id, ...input.shares.map((s) => s.member_id)]);
     const expense: ExpenseRecord = {
       id: randomUUID(),
@@ -52,6 +61,8 @@ export function createMemoryHouseholdStore(): HouseholdStore {
       payer_id: input.payer_id,
       split_type: input.split_type,
       expense_date: input.expense_date,
+      proof_url: null,
+      proof_public_id: null,
     };
     expenses.push(expense);
     for (const share of input.shares) {
@@ -61,12 +72,28 @@ export function createMemoryHouseholdStore(): HouseholdStore {
         share_amount: roundPkr(share.share_amount),
       });
     }
+    return expense;
   }
 
   return {
     kind: 'memory',
     async getMembers() {
-      return [...members];
+      return members.map((m) => ({ ...m }));
+    },
+    async createMember(input: CreateMemberInput) {
+      const member = prepareCreateMember(members, input);
+      members.push(member);
+      return { ...member };
+    },
+    async updateMember(id: string, input: UpdateMemberInput) {
+      const existing = findMember(members, id);
+      if (input.name !== undefined) {
+        assertUniqueMemberName(members, normalizeMemberName(input.name), id);
+      }
+      const updated = applyMemberUpdate(existing, input);
+      const index = members.findIndex((m) => m.id === id);
+      members[index] = updated;
+      return { ...updated };
     },
     async listShopping(status?: ShoppingStatus) {
       if (!status) return [...shopping];
@@ -105,10 +132,27 @@ export function createMemoryHouseholdStore(): HouseholdStore {
       for (const item of items) item.status = 'bought';
     },
     async createExpense(input) {
-      insertExpense(input);
+      return insertExpense(input);
+    },
+    async getExpense(id: string) {
+      const row = expenses.find((e) => e.id === id);
+      return row ? { ...row } : null;
+    },
+    async setExpenseProof(expenseId: string, input) {
+      const index = expenses.findIndex((e) => e.id === expenseId);
+      if (index < 0) {
+        throw new AppError(404, 'NOT_FOUND', 'Expense not found.');
+      }
+      const updated: ExpenseRecord = {
+        ...expenses[index],
+        proof_url: input.proof_url,
+        proof_public_id: input.proof_public_id ?? null,
+      };
+      expenses[index] = updated;
+      return { ...updated };
     },
     async listExpenses() {
-      return [...expenses];
+      return expenses.map((e) => ({ ...e }));
     },
     async listExpenseSplits() {
       return [...splits];
@@ -128,6 +172,12 @@ export function createMemoryHouseholdStore(): HouseholdStore {
     },
     async getMonthlyBudget() {
       return monthlyBudget;
+    },
+    async clearLedger() {
+      shopping.length = 0;
+      expenses.length = 0;
+      splits.length = 0;
+      settlements.length = 0;
     },
   };
 }

@@ -1,7 +1,11 @@
 export const POSTGRES_HOUSEHOLD_SCHEMA = `
 CREATE TABLE IF NOT EXISTS household_members (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  notes TEXT,
+  joined_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS shopping_items (
@@ -21,6 +25,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   payer_id TEXT NOT NULL REFERENCES household_members(id),
   split_type TEXT NOT NULL,
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  proof_url TEXT,
+  proof_public_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -48,7 +54,11 @@ CREATE TABLE IF NOT EXISTS household_settings (
 export const SQLITE_HOUSEHOLD_SCHEMA = `
 CREATE TABLE IF NOT EXISTS household_members (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  notes TEXT,
+  joined_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS shopping_items (
@@ -68,6 +78,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   payer_id TEXT NOT NULL,
   split_type TEXT NOT NULL,
   expense_date TEXT NOT NULL DEFAULT (date('now')),
+  proof_url TEXT,
+  proof_public_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (payer_id) REFERENCES household_members(id)
 );

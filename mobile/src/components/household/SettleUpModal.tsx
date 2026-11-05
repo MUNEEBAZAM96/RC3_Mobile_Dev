@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BottomSheet, CustomButton, InputField } from '../ui';
+import { AmountChipRow, BottomSheet, CustomButton, InputField } from '../ui';
+import { SETTLE_AMOUNT_CHIPS } from '../../features/household/presets';
+import { buildSuggestedTransfers } from '../../features/household/suggestedTransfers';
 import { settleSchema } from '../../features/household/schemas';
 import { householdApi } from '../../services/api/household';
 import { useTheme } from '../../theme';
@@ -108,6 +110,14 @@ function SettleForm({ members, balances, preset, onSuccess, onClose }: SettleFor
     return value > 0 ? value : null;
   }, [senderRow, recipientRow, samePerson]);
 
+  const transferSuggestions = useMemo(() => buildSuggestedTransfers(balances, 3), [balances]);
+
+  function applyTransfer(t: { sender_id: string; recipient_id: string; amount: number }) {
+    setSenderId(t.sender_id);
+    setRecipientId(t.recipient_id);
+    setAmount(t.amount.toFixed(2));
+  }
+
   async function submit() {
     if (loading) return;
     const parsed = settleSchema.safeParse({
@@ -150,6 +160,37 @@ function SettleForm({ members, balances, preset, onSuccess, onClose }: SettleFor
       <Text style={[type.body, { color: colors.muted }]}>
         Record a cash payment between two members. Settlements never change household spending.
       </Text>
+
+      {transferSuggestions.length > 0 ? (
+        <View style={{ gap: spacing.sm }}>
+          <Text style={[type.label, { color: colors.text }]}>Suggested payments</Text>
+          {transferSuggestions.map((t) => (
+            <Pressable
+              key={`${t.sender_id}-${t.recipient_id}-${t.amount}`}
+              onPress={() => applyTransfer(t)}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.sm,
+                minHeight: 48,
+                padding: spacing.sm + 4,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: colors.primary,
+                backgroundColor: colors.primarySoft,
+                opacity: pressed ? 0.88 : 1,
+              })}
+            >
+              <Ionicons name="arrow-forward-circle-outline" size={22} color={colors.primary} />
+              <Text style={[type.label, { color: colors.text, flex: 1 }]} numberOfLines={2}>
+                {nameFor(t.sender_id)} pays {nameFor(t.recipient_id)}
+              </Text>
+              <Text style={[type.label, { color: colors.primary }]}>{formatPkr(t.amount)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <View style={{ gap: spacing.sm }}>
         <Text style={[type.label, { color: colors.text }]}>Who is paying?</Text>
@@ -216,6 +257,12 @@ function SettleForm({ members, balances, preset, onSuccess, onClose }: SettleFor
             ? `Clears the most possible between them: ${formatPkr(suggested)}`
             : undefined
         }
+      />
+      <AmountChipRow
+        label="Demo amounts"
+        amounts={SETTLE_AMOUNT_CHIPS}
+        onSelect={(n) => setAmount(n.toFixed(2))}
+        selectedAmount={Number.isFinite(Number(amount)) ? Number(amount) : null}
       />
       <CustomButton
         label={suggested !== null ? `Suggest amount · ${formatPkr(suggested)}` : 'Suggest amount'}

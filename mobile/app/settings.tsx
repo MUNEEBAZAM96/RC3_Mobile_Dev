@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Screen } from '../src/components/layout/Screen';
@@ -10,14 +10,18 @@ import {
   CustomCard,
   InputField,
   ListRow,
+  QuickChipRow,
   SectionHeader,
   SegmentedControl,
   StatusPill,
 } from '../src/components/ui';
+import { getLastLanApiUrl, setLastLanApiUrl } from '../src/services/storage/lastLanApi';
 import { useSession } from '../src/features/auth/session';
+import { HouseholdMembersSection } from '../src/components/household/HouseholdMembersSection';
 import { householdApi } from '../src/services/api/household';
 import { getBaseUrl, setBaseUrl } from '../src/services/storage/baseUrl';
 import { useActivityFeed } from '../src/store/activityFeed';
+import { useHouseholdStore } from '../src/store/household';
 import { usePreferences, type ColorModePreference } from '../src/store/preferences';
 import { showToast } from '../src/store/toast';
 import { useTheme } from '../src/theme';
@@ -45,6 +49,7 @@ export default function SettingsScreen() {
   const linkedMemberId = usePreferences((s) => s.linkedMemberId);
   const resetAppearance = usePreferences((s) => s.resetAppearance);
   const clearFeed = useActivityFeed((s) => s.clear);
+  const { members, loadMembers } = useHouseholdStore();
 
   const [url, setUrl] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
@@ -58,6 +63,11 @@ export default function SettingsScreen() {
     getBaseUrl()
       .then(setUrl)
       .catch(() => undefined);
+    getLastLanApiUrl()
+      .then((saved) => {
+        if (saved) setUrl((current) => (current ? current : saved));
+      })
+      .catch(() => undefined);
     householdApi
       .getBudgetSummary()
       .then((summary) => {
@@ -67,6 +77,21 @@ export default function SettingsScreen() {
       .catch((err: unknown) => setBudgetError(errorMessage(err, 'Budget unavailable.')));
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadMembers(true);
+    }, [loadMembers]),
+  );
+
+  const flatMemberSubtitle = useMemo(() => {
+    if (members.length === 0) return 'Open Profile to manage members';
+    const names = members.map((m) => m.name).join(' · ');
+    if (names.length > 48) {
+      return `${members.length} members · ${names.slice(0, 45)}…`;
+    }
+    return names;
+  }, [members]);
+
   async function save() {
     if (saving) return;
     setSaving(true);
@@ -74,6 +99,7 @@ export default function SettingsScreen() {
     setNotice(null);
     try {
       await setBaseUrl(url);
+      await setLastLanApiUrl(url);
       const healthy = await householdApi.pingHealth();
       if (healthy) {
         setNotice('Saved. The API answered /health.');
@@ -130,6 +156,22 @@ export default function SettingsScreen() {
             keyboardType="url"
             placeholder="http://127.0.0.1:8080"
           />
+          <QuickChipRow
+            label="Quick connect"
+            options={[
+              { id: 'sim', label: 'Simulator', icon: 'phone-portrait-outline', sublabel: ':8080' },
+              { id: 'lan', label: 'Last LAN', icon: 'wifi-outline', sublabel: 'physical device' },
+            ]}
+            onSelect={(id) => {
+              if (id === 'sim') setUrl('http://127.0.0.1:8080');
+              else {
+                void getLastLanApiUrl().then((saved) => {
+                  if (saved) setUrl(saved);
+                  else showToast('Save a LAN URL once — we’ll remember it here.', 'info');
+                });
+              }
+            }}
+          />
           <CustomButton
             label="Save and test"
             icon="pulse-outline"
@@ -181,7 +223,7 @@ export default function SettingsScreen() {
         <CustomCard>
           <ListRow
             title={FLAT_NAME}
-            subtitle="Ali · Ayesha · Bilal"
+            subtitle={flatMemberSubtitle}
             leading={<IconBubble name="home-outline" />}
           />
           <ListRow
@@ -214,6 +256,8 @@ export default function SettingsScreen() {
           ) : null}
         </CustomCard>
       </View>
+
+      <HouseholdMembersSection variant="compact" />
 
       {/* Account */}
       <View>

@@ -5,14 +5,15 @@ import { Text, View } from 'react-native';
 import {
   BalanceSummaryTable,
   ExpenseForm,
+  ExpenseProofList,
   SettleUpModal,
   SmartSettleCard,
 } from '../../src/components/household';
 import { Screen } from '../../src/components/layout/Screen';
 import {
   AppHeader,
+  CollapsibleSection,
   CustomButton,
-  CustomCard,
   ErrorState,
   LoadingScreen,
   SectionHeader,
@@ -32,12 +33,15 @@ export default function ExpensesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settleOpen, setSettleOpen] = useState(false);
+  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
+  const [expenseListNonce, setExpenseListNonce] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       await loadMembers();
       setBalances(await householdApi.getBalances());
+      setExpenseListNonce((n) => n + 1);
     } catch (err) {
       setError(errorMessage(err, 'Could not load balances.'));
     } finally {
@@ -133,14 +137,28 @@ export default function ExpensesScreen() {
           />
         </View>
 
-        {/* Hour 3.5 (Option 1) */}
-        <SmartSettleCard members={members} onSettled={() => void load()} />
+        <View style={{ gap: spacing.sm }}>
+          <SectionHeader title="Recent expenses" />
+          <ExpenseProofList members={members} refreshNonce={expenseListNonce} />
+        </View>
 
-        {/* Log expense */}
-        <CustomCard>
-          <SectionHeader title="Log shared expense" />
-          <ExpenseForm members={members} onSuccess={() => void load()} />
-        </CustomCard>
+        <CollapsibleSection
+          title="Add shared expense"
+          subtitle="Quick bill chips · equal or custom split"
+          icon="add-circle-outline"
+          expanded={expenseFormOpen}
+          onToggle={() => setExpenseFormOpen((v) => !v)}
+        >
+          <ExpenseForm
+            members={members}
+            onSuccess={() => {
+              setExpenseFormOpen(false);
+              void load();
+            }}
+          />
+        </CollapsibleSection>
+
+        <SmartSettleCard members={members} onSettled={() => void load()} />
       </Screen>
 
       <SettleUpModal

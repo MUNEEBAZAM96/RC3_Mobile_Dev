@@ -12,11 +12,13 @@ import {
   VoiceCoachButton,
   type ChatMessage,
 } from '../src/components/assistant';
+import { useRefreshOverlayVisible } from '../src/hooks/useRefreshOverlayVisible';
 import {
   CustomButton,
   CustomCard,
   EmptyState,
   LoadingScreen,
+  RefreshSplashOverlay,
   StatusPill,
 } from '../src/components/ui';
 import { fetchHouseholdSnapshot, QUICK_PROMPTS, type HouseholdSnapshot } from '../src/features/assistant/context';
@@ -195,6 +197,7 @@ export default function AssistantScreen() {
   const speakingTo =
     snapshot?.members.find((m) => m.id === (linkedMemberId ?? activeMemberId))?.name ?? null;
   const bottomPad = Math.max(insets.bottom, spacing.sm);
+  const overlayVisible = useRefreshOverlayVisible(refreshing);
 
   return (
     <KeyboardAvoidingView
@@ -202,6 +205,7 @@ export default function AssistantScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? HEADER_HEIGHT_IOS + insets.top : 0}
     >
+      <RefreshSplashOverlay visible={overlayVisible} />
       <View style={{ gap: spacing.xs }}>
         <AssistantHeader
           speakingTo={speakingTo}

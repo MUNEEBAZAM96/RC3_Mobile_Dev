@@ -20,6 +20,19 @@ export interface Config {
   upliftTtsFormat: string;
   upliftPhraseReplacementConfigId: string | undefined;
   logLevel: string;
+  allowDevSeed: boolean;
+  cloudinaryCloudName: string | undefined;
+  cloudinaryApiKey: string | undefined;
+  cloudinaryApiSecret: string | undefined;
+}
+
+export function hasCloudinaryConfigured(): boolean {
+  const config = loadConfig();
+  return Boolean(config.cloudinaryCloudName && config.cloudinaryApiKey && config.cloudinaryApiSecret);
+}
+
+export function isDevSeedAllowed(): boolean {
+  return loadConfig().allowDevSeed;
 }
 
 export function hasGroqKey(): boolean {
@@ -78,6 +91,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     upliftTtsFormat: emptyToUndefined(env.UPLIFT_TTS_FORMAT) ?? 'MP3_22050_128',
     upliftPhraseReplacementConfigId: emptyToUndefined(env.UPLIFT_PHRASE_REPLACEMENT_CONFIG_ID),
     logLevel: env.LOG_LEVEL || 'warn',
+    allowDevSeed: env.NODE_ENV !== 'production' || env.ALLOW_DEV_SEED === 'true',
+    cloudinaryCloudName: emptyToUndefined(env.CLOUDINARY_CLOUD_NAME),
+    cloudinaryApiKey: emptyToUndefined(env.CLOUDINARY_API_KEY),
+    cloudinaryApiSecret: emptyToUndefined(env.CLOUDINARY_API_SECRET),
   };
   return cached;
 }

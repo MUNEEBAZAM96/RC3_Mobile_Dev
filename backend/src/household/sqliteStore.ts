@@ -8,8 +8,21 @@ import { AppError } from '../http/errors';
 import { roundPkr } from './money';
 import { SQLITE_HOUSEHOLD_SCHEMA } from './schema.sql';
 import { splitEqual } from './split';
+import {
+  applyMemberUpdate,
+  assertUniqueMemberName,
+  findMember,
+  mapMemberRow,
+  MEMBER_SELECT_SQLITE,
+  normalizeMemberName,
+  prepareCreateMember,
+} from './members';
+import { migrateSqliteMemberColumns } from './migrateMembers';
+import { migrateSqliteExpenseProofColumns } from './migrateExpensesProof';
+import { EXPENSE_LIST_SELECT_SQLITE, mapExpenseRow } from './expenseMap';
 import { DEFAULT_MEMBERS, DEFAULT_MONTHLY_BUDGET } from './seed';
 import type {
+  CreateMemberInput,
   ExpenseRecord,
   ExpenseSplitRecord,
   HouseholdStore,
@@ -19,6 +32,7 @@ import type {
   ShoppingStatus,
   ShoppingUnit,
   SplitShare,
+  UpdateMemberInput,
 } from './types';
 
 function seedIfEmpty(db: Database.Database): void {
@@ -55,7 +69,13 @@ export function createSqliteHouseholdStore(filePath: string): HouseholdStore {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SQLITE_HOUSEHOLD_SCHEMA);
+  migrateSqliteMemberColumns(db);
+  migrateSqliteExpenseProofColumns(db);
   seedIfEmpty(db);
+
+  function loadMembers(): Member[] {
+    return (db.prepare(`SELECT ${MEMBER_SELECT_SQLITE}`).all() as Member[]).map(mapMemberRow);
+  }
 
   function memberIds(): Set<string> {
     const rows = db.prepare('SELECT id FROM household_members').all() as { id: string }[];
@@ -77,7 +97,7 @@ export function createSqliteHouseholdStore(filePath: string): HouseholdStore {
     split_type: 'equal' | 'custom';
     expense_date: string;
     shares: SplitShare[];
-  }): void {
+  }): ExpenseRecord {
     const expenseId = randomUUID();
     db.prepare(
       `INSERT INTO expenses (id, title, category, amount, payer_id, split_type, expense_date)
@@ -97,12 +117,36 @@ export function createSqliteHouseholdStore(filePath: string): HouseholdStore {
     for (const share of input.shares) {
       insertSplit.run(expenseId, share.member_id, roundPkr(share.share_amount));
     }
+    const row = db
+      .prepare(`SELECT ${EXPENSE_LIST_SELECT_SQLITE} FROM expenses WHERE id = ?`)
+      .get(expenseId) as Parameters<typeof mapExpenseRow>[0];
+    return mapExpenseRow(row);
   }
 
   return {
     kind: 'sqlite',
     async getMembers() {
-      return db.prepare('SELECT id, name FROM household_members ORDER BY id').all() as Member[];
+      return loadMembers();
+    },
+    async createMember(input: CreateMemberInput) {
+      const members = loadMembers();
+      const member = prepareCreateMember(members, input);
+      db.prepare(
+        `INSERT INTO household_members (id, name, phone, email, notes, joined_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(member.id, member.name, member.phone, member.email, member.notes, member.joined_at);
+      return member;
+    },
+    async updateMember(id: string, input: UpdateMemberInput) {
+      const members = loadMembers();
+      const existing = findMember(members, id);
+      if (input.name !== undefined) {
+        assertUniqueMemberName(members, normalizeMemberName(input.name), id);
+      }
+      const updated = applyMemberUpdate(existing, input);
+      db.prepare(
+        `UPDATE household_members SET name = ?, phone = ?, email = ?, notes = ? WHERE id = ?`,
+      ).run(updated.name, updated.phone, updated.email, updated.notes, id);
+      return updated;
     },
     async listShopping(status?: ShoppingStatus) {
       const rows = status
@@ -157,16 +201,37 @@ export function createSqliteHouseholdStore(filePath: string): HouseholdStore {
     async createExpense(input) {
       assertMembers([input.payer_id, ...input.shares.map((s) => s.member_id)]);
       const tx = db.transaction(() => insertExpense(input));
-      tx();
+      return tx();
+    },
+    async getExpense(id: string) {
+      const row = db
+        .prepare(`SELECT ${EXPENSE_LIST_SELECT_SQLITE} FROM expenses WHERE id = ?`)
+        .get(id) as Parameters<typeof mapExpenseRow>[0] | undefined;
+      return row ? mapExpenseRow(row) : null;
+    },
+    async setExpenseProof(expenseId: string, input) {
+      const existing = db.prepare('SELECT id FROM expenses WHERE id = ?').get(expenseId);
+      if (!existing) {
+        throw new AppError(404, 'NOT_FOUND', 'Expense not found.');
+      }
+      db.prepare(`UPDATE expenses SET proof_url = ?, proof_public_id = ? WHERE id = ?`).run(
+        input.proof_url,
+        input.proof_public_id ?? null,
+        expenseId,
+      );
+      const row = db
+        .prepare(`SELECT ${EXPENSE_LIST_SELECT_SQLITE} FROM expenses WHERE id = ?`)
+        .get(expenseId) as Parameters<typeof mapExpenseRow>[0];
+      return mapExpenseRow(row);
     },
     async listExpenses() {
       return (
         db
           .prepare(
-            `SELECT id, title, category, amount, payer_id, split_type, expense_date FROM expenses ORDER BY created_at`,
+            `SELECT ${EXPENSE_LIST_SELECT_SQLITE} FROM expenses ORDER BY expense_date DESC, created_at DESC`,
           )
-          .all() as ExpenseRecord[]
-      ).map((row) => ({ ...row, amount: roundPkr(row.amount) }));
+          .all() as Parameters<typeof mapExpenseRow>[0][]
+      ).map(mapExpenseRow);
     },
     async listExpenseSplits() {
       return (db.prepare(`SELECT expense_id, member_id, share_amount FROM expense_splits`).all() as ExpenseSplitRecord[]).map(
@@ -192,6 +257,15 @@ export function createSqliteHouseholdStore(filePath: string): HouseholdStore {
         .prepare(`SELECT value FROM household_settings WHERE key = 'monthly_budget'`)
         .get() as { value: string } | undefined;
       return row?.value ? Number(row.value) : DEFAULT_MONTHLY_BUDGET;
+    },
+    async clearLedger() {
+      const tx = db.transaction(() => {
+        db.prepare('DELETE FROM expense_splits').run();
+        db.prepare('DELETE FROM expenses').run();
+        db.prepare('DELETE FROM settlements').run();
+        db.prepare('DELETE FROM shopping_items').run();
+      });
+      tx();
     },
   };
 }

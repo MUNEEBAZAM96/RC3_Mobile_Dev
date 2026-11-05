@@ -7,7 +7,9 @@ import {
   StyleSheet,
 } from 'react-native';
 
+import { useRefreshOverlayVisible } from '../../hooks/useRefreshOverlayVisible';
 import { useTheme } from '../../theme';
+import { RefreshSplashOverlay } from '../ui/RefreshSplashOverlay';
 
 interface ScreenProps {
   children: ReactNode;
@@ -19,11 +21,14 @@ interface ScreenProps {
 
 export function Screen({ children, refreshing, onRefresh, bottomInset = 0 }: ScreenProps) {
   const { colors, spacing } = useTheme();
+  const overlayVisible = useRefreshOverlayVisible(Boolean(refreshing && onRefresh));
+
   return (
     <KeyboardAvoidingView
       style={styles.fill}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <RefreshSplashOverlay visible={overlayVisible} />
       <ScrollView
         style={[styles.fill, { backgroundColor: colors.background }]}
         contentContainerStyle={[

@@ -14,8 +14,10 @@ import {
   ErrorState,
   InputField,
   LoadingScreen,
+  QuickChipRow,
   SectionHeader,
 } from '../../src/components/ui';
+import { SHOPPING_QUICK_ITEMS } from '../../src/features/household/presets';
 import { createShoppingItemSchema } from '../../src/features/household/schemas';
 import { householdApi } from '../../src/services/api/household';
 import { useHouseholdStore } from '../../src/store/household';
@@ -146,6 +148,22 @@ export default function ShoppingScreen() {
             placeholder="Milk, rice, dish soap…"
             returnKeyType="done"
             onSubmitEditing={() => void addItem()}
+          />
+          <QuickChipRow
+            label="Quick add"
+            options={SHOPPING_QUICK_ITEMS.map((item) => ({
+              id: item.id,
+              label: item.title,
+              icon: UNIT_ICON[item.unit],
+              sublabel: `${item.requested_qty} ${item.unit}`,
+            }))}
+            onSelect={(id) => {
+              const item = SHOPPING_QUICK_ITEMS.find((i) => i.id === id);
+              if (!item) return;
+              setTitle(item.title);
+              setUnit(item.unit);
+              setQty(item.requested_qty);
+            }}
           />
           <View style={{ gap: spacing.xs }}>
             <Text style={[type.label, { color: colors.text }]}>Unit</Text>

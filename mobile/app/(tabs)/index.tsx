@@ -12,7 +12,7 @@ import {
 } from '../../src/components/household';
 import { Screen } from '../../src/components/layout/Screen';
 import { LinkRoommateModal } from '../../src/components/onboarding/LinkRoommateModal';
-import { ErrorState, LoadingScreen } from '../../src/components/ui';
+import { CustomCard, ErrorState, LoadingScreen, QuickChipRow } from '../../src/components/ui';
 import { useSession } from '../../src/features/auth/session';
 import { householdApi, isUnavailable } from '../../src/services/api/household';
 import { useHouseholdStore } from '../../src/store/household';
@@ -134,6 +134,14 @@ export default function HomeScreen() {
             GharSplit
           </Text>
           <Text style={[type.body, { color: colors.muted }]}>Shared flat · Lahore</Text>
+          <Pressable
+            onPress={() => router.push('/profile')}
+            accessibilityRole="link"
+            accessibilityLabel="Manage flat members"
+            style={{ minHeight: minTapTarget, justifyContent: 'center' }}
+          >
+            <Text style={[type.label, { color: colors.primary, fontSize: 14 }]}>Manage flat members</Text>
+          </Pressable>
         </View>
         <HeaderButton
           label={isSignedIn ? 'Profile' : 'Sign in'}
@@ -166,6 +174,28 @@ export default function HomeScreen() {
           onRetry={() => void loadDashboard()}
         />
       ) : null}
+
+      <CustomCard>
+        <QuickChipRow
+          label="Quick actions"
+          options={[
+            { id: 'settle', label: 'Settle up', icon: 'swap-horizontal-outline' },
+            { id: 'bill', label: 'Add bill', icon: 'receipt-outline' },
+            { id: 'shop', label: 'Shopping', icon: 'cart-outline' },
+          ]}
+          onSelect={(id) => {
+            if (id === 'settle') {
+              router.push('/(tabs)/expenses');
+              showToast('Tap Settle up on Expenses.', 'info');
+            } else if (id === 'bill') {
+              router.push('/(tabs)/expenses');
+              showToast('Open Add shared expense below balances.', 'info');
+            } else {
+              router.push('/(tabs)/shopping');
+            }
+          }}
+        />
+      </CustomCard>
 
       {/* Member switcher */}
       {members.length > 0 ? (

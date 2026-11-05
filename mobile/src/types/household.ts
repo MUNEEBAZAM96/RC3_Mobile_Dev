@@ -9,6 +9,25 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export interface Member {
   id: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  joined_at?: string | null;
+}
+
+export interface CreateMemberPayload {
+  name: string;
+  id?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
+export interface UpdateMemberPayload {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
 }
 
 export interface ShoppingItem {
@@ -58,6 +77,18 @@ export type SplitType = 'equal' | 'custom';
 export interface ExpenseSplitInput {
   member_id: string;
   amount: number;
+}
+
+export interface HouseholdExpense {
+  id: string;
+  title: string;
+  category: string;
+  amount: number;
+  payer_id: string;
+  split_type: SplitType;
+  expense_date: string;
+  proof_url?: string | null;
+  proof_public_id?: string | null;
 }
 
 export interface CreateExpensePayload {

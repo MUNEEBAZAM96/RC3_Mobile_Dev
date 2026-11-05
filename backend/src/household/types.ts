@@ -5,6 +5,25 @@ export type SplitType = 'equal' | 'custom';
 export interface Member {
   id: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  joined_at?: string | null;
+}
+
+export interface CreateMemberInput {
+  name: string;
+  id?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
+export interface UpdateMemberInput {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
 }
 
 export interface ShoppingItem {
@@ -23,6 +42,13 @@ export interface ExpenseRecord {
   payer_id: string;
   split_type: SplitType;
   expense_date: string;
+  proof_url?: string | null;
+  proof_public_id?: string | null;
+}
+
+export interface SetExpenseProofInput {
+  proof_url: string;
+  proof_public_id?: string | null;
 }
 
 export interface ExpenseSplitRecord {
@@ -67,6 +93,8 @@ export type HouseholdStoreKind = 'postgres' | 'sqlite' | 'memory';
 export interface HouseholdStore {
   readonly kind: HouseholdStoreKind;
   getMembers(): Promise<Member[]>;
+  createMember(input: CreateMemberInput): Promise<Member>;
+  updateMember(id: string, input: UpdateMemberInput): Promise<Member>;
   listShopping(status?: ShoppingStatus): Promise<ShoppingItem[]>;
   createShoppingItem(input: { title: string; unit: ShoppingUnit; requested_qty: number }): Promise<ShoppingItem>;
   checkout(input: {
@@ -83,10 +111,14 @@ export interface HouseholdStore {
     split_type: SplitType;
     expense_date: string;
     shares: SplitShare[];
-  }): Promise<void>;
+  }): Promise<ExpenseRecord>;
+  getExpense(id: string): Promise<ExpenseRecord | null>;
+  setExpenseProof(expenseId: string, input: SetExpenseProofInput): Promise<ExpenseRecord>;
   listSettlements(): Promise<SettlementRecord[]>;
   listExpenses(): Promise<ExpenseRecord[]>;
   listExpenseSplits(): Promise<ExpenseSplitRecord[]>;
   addSettlement(input: { sender_id: string; recipient_id: string; amount: number }): Promise<void>;
   getMonthlyBudget(): Promise<number>;
+  /** Removes shopping, expenses, splits, and settlements; keeps members and budget settings. */
+  clearLedger(): Promise<void>;
 }

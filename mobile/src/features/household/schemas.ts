@@ -65,6 +65,36 @@ export const expenseSchema = z
     }
   });
 
+const optionalEmail = z
+  .string()
+  .trim()
+  .optional()
+  .refine((v) => v === undefined || v === '' || z.string().email().safeParse(v).success, {
+    message: 'Enter a valid email or leave blank.',
+  });
+
+export const memberCreateSchema = z.object({
+  name: z.string().trim().min(1, 'Enter a name.').max(80),
+  id: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9_-]{1,32}$/, 'Id must be 1–32 letters, numbers, _ or -.')
+      .optional(),
+  ),
+  phone: z.string().trim().optional(),
+  email: optionalEmail,
+  notes: z.string().trim().optional(),
+});
+
+export const memberUpdateSchema = z.object({
+  name: z.string().trim().min(1, 'Enter a name.').max(80).optional(),
+  phone: z.string().trim().nullable().optional(),
+  email: z.union([optionalEmail, z.null()]).optional(),
+  notes: z.string().trim().nullable().optional(),
+});
+
 export const settleSchema = z
   .object({
     sender_id: z.string().min(1, 'Choose who pays.'),

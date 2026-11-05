@@ -1,12 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { CustomButton, InputField, StatusPill } from '../ui';
+import { AmountChipRow, CustomButton, InputField, QuickChipRow, StatusPill } from '../ui';
+import { DateQuickPick } from './DateQuickPick';
+import {
+  pickExpenseProofFromCamera,
+  pickExpenseProofFromLibrary,
+  uriToBase64,
+  type ExpenseProofMime,
+} from '../../features/household/expenseProof';
 import { expenseSchema } from '../../features/household/schemas';
-import { householdApi } from '../../services/api/household';
+import {
+  CUSTOM_SPLIT_TEMPLATES,
+  EXPENSE_AMOUNT_CHIPS,
+  EXPENSE_TITLE_PRESETS,
+} from '../../features/household/presets';
+import { ApiError, householdApi } from '../../services/api/household';
 import { pushEvent } from '../../store/activityFeed';
 import { clampDueDay, upsertRecurringTemplate } from '../../store/recurringSchedule';
 import { showToast } from '../../store/toast';
@@ -32,6 +44,15 @@ const CATEGORY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   Cleaning: 'sparkles-outline',
 };
 
+const TITLE_PRESET_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  grocery: 'basket-outline',
+  cleaning: 'sparkles-outline',
+  internet: 'wifi-outline',
+  electricity: 'flash-outline',
+  gas: 'flame-outline',
+  maid: 'person-outline',
+};
+
 export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
   const { colors, spacing, type, radius, minTapTarget } = useTheme();
   const [title, setTitle] = useState('');
@@ -49,6 +70,9 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
   const [isRecurring, setIsRecurring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [proofUri, setProofUri] = useState<string | null>(null);
+  const [proofMime, setProofMime] = useState<ExpenseProofMime | null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
 
   const defaultPayerId = members.find((m) => m.id === 'M01')?.id ?? members[0]?.id ?? null;
   const payerId = chosenPayerId ?? defaultPayerId;
@@ -85,6 +109,52 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
     );
   }
 
+  function applyTitlePreset(presetId: string) {
+    const preset = EXPENSE_TITLE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setTitle(preset.title);
+    if (preset.category) {
+      setOtherCategory(false);
+      setCategory(preset.category);
+    }
+    if (preset.amount !== undefined) setAmount(String(preset.amount));
+  }
+
+  function applyCustomTemplate(templateId: string) {
+    const template = CUSTOM_SPLIT_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    setSplitType('custom');
+    setAmount(String(template.totalAmount));
+    const next: Record<string, string> = {};
+    for (const m of members) next[m.id] = '';
+    for (const share of template.shares) {
+      if (members.some((m) => m.id === share.member_id)) {
+        next[share.member_id] = String(share.amount);
+      }
+    }
+    setCustomAmounts(next);
+  }
+
+  function fillEqualIntoCustomFields() {
+    const total = Number(amount);
+    if (!Number.isFinite(total) || total <= 0) return;
+    const ids = members.map((m) => m.id);
+    const preview = previewEqualSplit(total, ids);
+    const next: Record<string, string> = {};
+    for (const row of preview) next[row.member_id] = String(row.amount);
+    setCustomAmounts(next);
+    setSplitType('custom');
+  }
+
+  function fillRemainderFor(memberId: string) {
+    if (remaining === null || remaining <= 0) return;
+    const current = Number(customAmounts[memberId]) || 0;
+    setCustomAmounts((prev) => ({
+      ...prev,
+      [memberId]: String(Math.round((current + remaining) * 100) / 100),
+    }));
+  }
+
   function resetForm() {
     setTitle('');
     setAmount('');
@@ -95,10 +165,20 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
     setCustomAmounts({});
     setEqualMemberIds(null);
     setSplitType('equal');
+    setProofUri(null);
+    setProofMime(null);
+  }
+
+  async function attachProof(from: 'camera' | 'library') {
+    const picked =
+      from === 'camera' ? await pickExpenseProofFromCamera() : await pickExpenseProofFromLibrary();
+    if (!picked) return;
+    setProofUri(picked.uri);
+    setProofMime(picked.mimeType);
   }
 
   async function submit() {
-    if (loading) return;
+    if (loading || proofUploading) return;
     const custom_splits = members.map((m) => ({
       member_id: m.id,
       amount: Number(customAmounts[m.id] || 0),
@@ -122,7 +202,7 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
     setError(null);
     try {
       const data = parsed.data;
-      await householdApi.createExpense({
+      const created = await householdApi.createExpense({
         title: data.title,
         category: data.category,
         amount: data.amount,
@@ -136,6 +216,26 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
             : undefined,
         ...(data.is_recurring ? { is_recurring: true } : {}),
       });
+
+      if (proofUri && proofMime) {
+        setProofUploading(true);
+        try {
+          const image_base64 = await uriToBase64(proofUri);
+          await householdApi.uploadExpenseProof(created.id, {
+            mime_type: proofMime,
+            image_base64,
+          });
+        } catch (proofErr) {
+          const hint =
+            proofErr instanceof ApiError && proofErr.status === 503
+              ? ' Proof upload is not configured on the server.'
+              : '';
+          showToast(`Expense saved; proof upload failed.${hint}`);
+        } finally {
+          setProofUploading(false);
+        }
+      }
+
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const payerName = members.find((m) => m.id === data.payer_id)?.name;
       if (data.is_recurring) {
@@ -176,29 +276,33 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
         placeholder="Internet bill"
         returnKeyType="next"
       />
+      <QuickChipRow
+        label="Quick bills"
+        options={EXPENSE_TITLE_PRESETS.map((p) => ({
+          id: p.id,
+          label: p.title,
+          icon: TITLE_PRESET_ICON[p.id] ?? 'receipt-outline',
+          sublabel: p.amount ? `PKR ${p.amount}` : undefined,
+        }))}
+        onSelect={applyTitlePreset}
+      />
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <View style={{ flex: 1.2 }}>
-          <InputField
-            label="Amount"
-            prefix="PKR"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholder="1500.00"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <InputField
-            label="Date"
-            value={date}
-            onChangeText={setDate}
-            autoCapitalize="none"
-            keyboardType="numbers-and-punctuation"
-            placeholder="YYYY-MM-DD"
-          />
-        </View>
-      </View>
+      <InputField
+        label="Amount"
+        prefix="PKR"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="decimal-pad"
+        placeholder="1500.00"
+      />
+      <AmountChipRow
+        amounts={EXPENSE_AMOUNT_CHIPS}
+        onSelect={(n) => setAmount(String(n))}
+        selectedAmount={Number.isFinite(Number(amount)) ? Number(amount) : null}
+        format={(n) => `${n}`}
+      />
+
+      <DateQuickPick value={date} onChange={setDate} />
 
       {/* Category chips */}
       <View style={{ gap: spacing.sm }}>
@@ -313,16 +417,46 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
             </>
           ) : (
             <>
+              <QuickChipRow
+                label="Split templates"
+                options={CUSTOM_SPLIT_TEMPLATES.filter(
+                  (t) =>
+                    members.length >= 3 ||
+                    t.shares.every((s) => members.some((m) => m.id === s.member_id)),
+                ).map((t) => ({
+                  id: t.id,
+                  label: t.label,
+                  icon: 'git-branch-outline',
+                  sublabel: `PKR ${t.totalAmount}`,
+                }))}
+                onSelect={applyCustomTemplate}
+              />
+              <CustomButton
+                label="Split equally into fields"
+                icon="calculator-outline"
+                variant="ghost"
+                size="sm"
+                onPress={fillEqualIntoCustomFields}
+              />
               {members.map((member) => (
-                <InputField
-                  key={member.id}
-                  label={`${member.name}'s share`}
-                  prefix="PKR"
-                  value={customAmounts[member.id] ?? ''}
-                  onChangeText={(v) => setCustomAmounts((prev) => ({ ...prev, [member.id]: v }))}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                />
+                <View key={member.id} style={{ gap: spacing.xs }}>
+                  <InputField
+                    label={`${member.name}'s share`}
+                    prefix="PKR"
+                    value={customAmounts[member.id] ?? ''}
+                    onChangeText={(v) => setCustomAmounts((prev) => ({ ...prev, [member.id]: v }))}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                  />
+                  {remaining !== null && remaining > 0 ? (
+                    <CustomButton
+                      label={`Add remaining ${formatPkr(remaining)} here`}
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => fillRemainderFor(member.id)}
+                    />
+                  ) : null}
+                </View>
               ))}
               <View
                 style={{
@@ -355,6 +489,58 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
             </>
           )}
         </Animated.View>
+      </View>
+
+      <View style={{ gap: spacing.sm }}>
+        <Text style={[type.label, { color: colors.text }]}>Payment proof (optional)</Text>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+          <CustomButton
+            label="Take photo"
+            icon="camera-outline"
+            variant="secondary"
+            size="sm"
+            onPress={() => void attachProof('camera')}
+            disabled={loading || proofUploading}
+          />
+          <CustomButton
+            label="Choose from gallery"
+            icon="images-outline"
+            variant="secondary"
+            size="sm"
+            onPress={() => void attachProof('library')}
+            disabled={loading || proofUploading}
+          />
+        </View>
+        {proofUri ? (
+          <View style={{ gap: spacing.sm }}>
+            <Image
+              source={{ uri: proofUri }}
+              style={{
+                width: '100%',
+                height: 160,
+                borderRadius: radius.md,
+                backgroundColor: colors.surface,
+              }}
+              resizeMode="cover"
+              accessibilityLabel="Payment proof preview"
+            />
+            <CustomButton
+              label="Remove proof"
+              icon="trash-outline"
+              variant="ghost"
+              size="sm"
+              onPress={() => {
+                setProofUri(null);
+                setProofMime(null);
+              }}
+              disabled={loading || proofUploading}
+            />
+          </View>
+        ) : (
+          <Text style={[type.caption, { color: colors.muted }]}>
+            Attach a receipt or transfer screenshot so roommates can verify payment.
+          </Text>
+        )}
       </View>
 
       {/* Recurring (Hour 3.5 · Option 4) */}
@@ -410,8 +596,8 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
         label="Save expense"
         icon="add-circle-outline"
         onPress={() => void submit()}
-        loading={loading}
-        disabled={loading}
+        loading={loading || proofUploading}
+        disabled={loading || proofUploading}
       />
     </View>
   );

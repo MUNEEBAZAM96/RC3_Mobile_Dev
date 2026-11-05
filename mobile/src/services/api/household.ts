@@ -5,8 +5,11 @@ import type {
   CategorySpending,
   CheckoutPayload,
   CreateExpensePayload,
+  HouseholdExpense,
   CreateShoppingItemInput,
+  CreateMemberPayload,
   Member,
+  UpdateMemberPayload,
   RecurringApplyResult,
   SettlePayload,
   SettlementSuggestion,
@@ -47,7 +50,17 @@ function normalizeMember(raw: Record<string, unknown>): Member {
   return {
     id: String(raw.id ?? raw.member_id ?? ''),
     name: String(raw.name ?? ''),
+    phone: raw.phone != null && String(raw.phone).length > 0 ? String(raw.phone) : null,
+    email: raw.email != null && String(raw.email).length > 0 ? String(raw.email) : null,
+    notes: raw.notes != null && String(raw.notes).length > 0 ? String(raw.notes) : null,
+    joined_at: raw.joined_at != null && String(raw.joined_at).length > 0 ? String(raw.joined_at) : null,
   };
+}
+
+function pickMember(body: unknown): Member {
+  const obj = pickObject(body, ['member', 'data']) ?? (body as Record<string, unknown>);
+  const raw = (obj.member ?? obj) as Record<string, unknown>;
+  return normalizeMember(raw);
 }
 
 function normalizeShoppingItem(raw: Record<string, unknown>): ShoppingItem {
@@ -72,6 +85,30 @@ function normalizeBalance(raw: Record<string, unknown>): BalanceRow {
   };
 }
 
+function normalizeExpense(raw: Record<string, unknown>): HouseholdExpense {
+  return {
+    id: String(raw.id ?? ''),
+    title: String(raw.title ?? ''),
+    category: String(raw.category ?? ''),
+    amount: Number(raw.amount ?? 0),
+    payer_id: String(raw.payer_id ?? raw.payerId ?? ''),
+    split_type: (raw.split_type === 'custom' ? 'custom' : 'equal') as HouseholdExpense['split_type'],
+    expense_date: String(raw.expense_date ?? raw.date ?? ''),
+    proof_url:
+      raw.proof_url != null && String(raw.proof_url).length > 0 ? String(raw.proof_url) : null,
+    proof_public_id:
+      raw.proof_public_id != null && String(raw.proof_public_id).length > 0
+        ? String(raw.proof_public_id)
+        : null,
+  };
+}
+
+function pickExpense(body: unknown): HouseholdExpense {
+  const obj = pickObject(body, ['expense', 'data']) ?? (body as Record<string, unknown>);
+  const raw = (obj.expense ?? obj) as Record<string, unknown>;
+  return normalizeExpense(raw);
+}
+
 function normalizeBudget(raw: Record<string, unknown>): BudgetSummary {
   const monthly = Number(raw.monthly_budget ?? raw.monthlyBudget ?? DEFAULT_MONTHLY_BUDGET_PKR);
   const spending = Number(raw.total_spending ?? raw.totalSpending ?? 0);
@@ -94,6 +131,24 @@ export const householdApi = {
     return pickArray<Record<string, unknown>>(body, ['members', 'data'])
       .map(normalizeMember)
       .filter((m) => m.id.length > 0);
+  },
+
+  async createMember(payload: CreateMemberPayload): Promise<Member> {
+    const body = await request<unknown>(
+      '/api/members',
+      { method: 'POST', body: JSON.stringify(payload) },
+      false,
+    );
+    return pickMember(body);
+  },
+
+  async updateMember(id: string, payload: UpdateMemberPayload): Promise<Member> {
+    const body = await request<unknown>(
+      `/api/members/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify(payload) },
+      false,
+    );
+    return pickMember(body);
   },
 
   async getShopping(status?: 'pending' | 'bought'): Promise<ShoppingItem[]> {
@@ -123,8 +178,32 @@ export const householdApi = {
     );
   },
 
-  async createExpense(payload: CreateExpensePayload): Promise<void> {
-    await request('/api/expenses', { method: 'POST', body: JSON.stringify(payload) }, false);
+  async createExpense(payload: CreateExpensePayload): Promise<HouseholdExpense> {
+    const body = await request<unknown>(
+      '/api/expenses',
+      { method: 'POST', body: JSON.stringify(payload) },
+      false,
+    );
+    return pickExpense(body);
+  },
+
+  async getExpenses(): Promise<HouseholdExpense[]> {
+    const body = await request<unknown>('/api/expenses', {}, false);
+    return pickArray<Record<string, unknown>>(body, ['expenses', 'data'])
+      .map(normalizeExpense)
+      .filter((row) => row.id.length > 0);
+  },
+
+  async uploadExpenseProof(
+    expenseId: string,
+    payload: { mime_type: string; image_base64: string },
+  ): Promise<HouseholdExpense> {
+    const body = await request<unknown>(
+      `/api/expenses/${encodeURIComponent(expenseId)}/proof`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      false,
+    );
+    return pickExpense(body);
   },
 
   async getBalances(): Promise<BalanceRow[]> {

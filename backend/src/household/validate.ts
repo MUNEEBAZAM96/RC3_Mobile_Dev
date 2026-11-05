@@ -37,8 +37,57 @@ export const expenseSchema = z
     }
   });
 
+export const expenseProofUploadSchema = z.object({
+  mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  image_base64: z.string().min(1).max(7_000_000),
+});
+
 export const settleSchema = z.object({
   sender_id: z.string().min(1),
   recipient_id: z.string().min(1),
   amount: z.number().positive(),
 });
+
+const optionalTrimmed = z.string().trim().optional();
+
+export const createMemberSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  id: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9_-]{1,32}$/)
+      .optional(),
+  ),
+  phone: optionalTrimmed,
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => v === undefined || v === '' || z.string().email().safeParse(v).success, {
+      message: 'Invalid email',
+    }),
+  notes: optionalTrimmed,
+});
+
+export const updateMemberSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    phone: z.string().trim().nullable().optional(),
+    email: z
+      .union([z.string().trim(), z.null()])
+      .optional()
+      .refine((v) => v === undefined || v === null || v === '' || z.string().email().safeParse(v).success, {
+        message: 'Invalid email',
+      }),
+    notes: z.string().trim().nullable().optional(),
+  })
+  .refine(
+    (data) =>
+      data.name !== undefined ||
+      data.phone !== undefined ||
+      data.email !== undefined ||
+      data.notes !== undefined,
+    { message: 'At least one field is required to update a member.' },
+  );

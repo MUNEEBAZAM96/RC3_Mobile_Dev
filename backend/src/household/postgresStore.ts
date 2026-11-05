@@ -6,8 +6,21 @@ import { AppError } from '../http/errors';
 import { roundPkr } from './money';
 import { POSTGRES_HOUSEHOLD_SCHEMA } from './schema.sql';
 import { splitEqual } from './split';
+import {
+  applyMemberUpdate,
+  assertUniqueMemberName,
+  findMember,
+  mapMemberRow,
+  MEMBER_SELECT_POSTGRES,
+  normalizeMemberName,
+  prepareCreateMember,
+} from './members';
+import { migratePostgresMemberColumns } from './migrateMembers';
+import { migratePostgresExpenseProofColumns } from './migrateExpensesProof';
+import { EXPENSE_LIST_SELECT_POSTGRES, mapExpenseRow } from './expenseMap';
 import { DEFAULT_MEMBERS, DEFAULT_MONTHLY_BUDGET } from './seed';
 import type {
+  CreateMemberInput,
   ExpenseRecord,
   ExpenseSplitRecord,
   HouseholdStore,
@@ -17,6 +30,7 @@ import type {
   ShoppingStatus,
   ShoppingUnit,
   SplitShare,
+  UpdateMemberInput,
 } from './types';
 
 async function seedIfEmpty(pool: pg.Pool): Promise<void> {
@@ -51,7 +65,14 @@ function mapShopping(row: {
 export async function createPostgresHouseholdStore(databaseUrl: string): Promise<HouseholdStore> {
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
   await pool.query(POSTGRES_HOUSEHOLD_SCHEMA);
+  await migratePostgresMemberColumns(pool);
+  await migratePostgresExpenseProofColumns(pool);
   await seedIfEmpty(pool);
+
+  async function loadMembers(): Promise<Member[]> {
+    const result = await pool.query<Member>(`SELECT ${MEMBER_SELECT_POSTGRES}`);
+    return result.rows.map(mapMemberRow);
+  }
 
   async function memberIds(): Promise<Set<string>> {
     const result = await pool.query<{ id: string }>('SELECT id FROM household_members');
@@ -73,7 +94,7 @@ export async function createPostgresHouseholdStore(databaseUrl: string): Promise
     split_type: 'equal' | 'custom';
     expense_date: string;
     shares: SplitShare[];
-  }): Promise<void> {
+  }): Promise<ExpenseRecord> {
     const expenseId = randomUUID();
     await client.query(
       `INSERT INTO expenses (id, title, category, amount, payer_id, split_type, expense_date)
@@ -94,13 +115,39 @@ export async function createPostgresHouseholdStore(databaseUrl: string): Promise
         [expenseId, share.member_id, roundPkr(share.share_amount)],
       );
     }
+    const row = await client.query<Parameters<typeof mapExpenseRow>[0]>(
+      `SELECT ${EXPENSE_LIST_SELECT_POSTGRES} FROM expenses WHERE id = $1`,
+      [expenseId],
+    );
+    return mapExpenseRow(row.rows[0]);
   }
 
   return {
     kind: 'postgres',
     async getMembers() {
-      const result = await pool.query<Member>('SELECT id, name FROM household_members ORDER BY id');
-      return result.rows;
+      return loadMembers();
+    },
+    async createMember(input: CreateMemberInput) {
+      const members = await loadMembers();
+      const member = prepareCreateMember(members, input);
+      await pool.query(
+        `INSERT INTO household_members (id, name, phone, email, notes, joined_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [member.id, member.name, member.phone, member.email, member.notes, member.joined_at],
+      );
+      return member;
+    },
+    async updateMember(id: string, input: UpdateMemberInput) {
+      const members = await loadMembers();
+      const existing = findMember(members, id);
+      if (input.name !== undefined) {
+        assertUniqueMemberName(members, normalizeMemberName(input.name), id);
+      }
+      const updated = applyMemberUpdate(existing, input);
+      await pool.query(
+        `UPDATE household_members SET name = $1, phone = $2, email = $3, notes = $4 WHERE id = $5`,
+        [updated.name, updated.phone, updated.email, updated.notes, id],
+      );
+      return updated;
     },
     async listShopping(status?: ShoppingStatus) {
       const result = status
@@ -164,8 +211,9 @@ export async function createPostgresHouseholdStore(databaseUrl: string): Promise
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await insertExpense(client, input);
+        const expense = await insertExpense(client, input);
         await client.query('COMMIT');
+        return expense;
       } catch (err) {
         await client.query('ROLLBACK');
         throw err;
@@ -173,12 +221,40 @@ export async function createPostgresHouseholdStore(databaseUrl: string): Promise
         client.release();
       }
     },
-    async listExpenses() {
-      const result = await pool.query<ExpenseRecord>(
-        `SELECT id, title, category, amount::float8 AS amount, payer_id, split_type, expense_date::text AS expense_date
-         FROM expenses ORDER BY created_at`,
+    async getExpense(id: string) {
+      const result = await pool.query<Parameters<typeof mapExpenseRow>[0]>(
+        `SELECT ${EXPENSE_LIST_SELECT_POSTGRES} FROM expenses WHERE id = $1`,
+        [id],
       );
-      return result.rows.map((row) => ({ ...row, amount: roundPkr(Number(row.amount)) }));
+      const row = result.rows[0];
+      return row ? mapExpenseRow(row) : null;
+    },
+    async setExpenseProof(expenseId: string, input) {
+      const client = await pool.connect();
+      try {
+        const existing = await client.query('SELECT id FROM expenses WHERE id = $1', [expenseId]);
+        if (existing.rowCount === 0) {
+          throw new AppError(404, 'NOT_FOUND', 'Expense not found.');
+        }
+        await client.query(`UPDATE expenses SET proof_url = $1, proof_public_id = $2 WHERE id = $3`, [
+          input.proof_url,
+          input.proof_public_id ?? null,
+          expenseId,
+        ]);
+        const row = await client.query<Parameters<typeof mapExpenseRow>[0]>(
+          `SELECT ${EXPENSE_LIST_SELECT_POSTGRES} FROM expenses WHERE id = $1`,
+          [expenseId],
+        );
+        return mapExpenseRow(row.rows[0]);
+      } finally {
+        client.release();
+      }
+    },
+    async listExpenses() {
+      const result = await pool.query<Parameters<typeof mapExpenseRow>[0]>(
+        `SELECT ${EXPENSE_LIST_SELECT_POSTGRES} FROM expenses ORDER BY expense_date DESC, created_at DESC`,
+      );
+      return result.rows.map(mapExpenseRow);
     },
     async listExpenseSplits() {
       const result = await pool.query<ExpenseSplitRecord>(
@@ -205,6 +281,22 @@ export async function createPostgresHouseholdStore(databaseUrl: string): Promise
       );
       const raw = result.rows[0]?.value;
       return raw ? Number(raw) : DEFAULT_MONTHLY_BUDGET;
+    },
+    async clearLedger() {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM expense_splits');
+        await client.query('DELETE FROM expenses');
+        await client.query('DELETE FROM settlements');
+        await client.query('DELETE FROM shopping_items');
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
     },
   };
 }

@@ -21,6 +21,9 @@ interface PreferencesState extends AppConfig {
   linkedMemberPromptDone: boolean;
   /** True after persisted values have been read from the device. */
   hydrated: boolean;
+  /** Demo operator: show add/rename roommate tools in Settings. */
+  householdAdminMode: boolean;
+  setHouseholdAdminMode: (enabled: boolean) => void;
   setPresetId: (presetId: ThemePresetId) => void;
   setTabVariant: (tabVariant: TabBarVariant) => void;
   setTabLayout: (tabLayout: AppConfig['tabLayout']) => void;
@@ -41,7 +44,9 @@ export const usePreferences = create<PreferencesState>()(
       colorMode: 'system',
       linkedMemberId: null,
       linkedMemberPromptDone: false,
+      householdAdminMode: false,
       hydrated: false,
+      setHouseholdAdminMode: (householdAdminMode) => set({ householdAdminMode }),
       setPresetId: (presetId) => set({ presetId }),
       setTabVariant: (tabVariant) => set({ tabVariant }),
       setTabLayout: (tabLayout) => set({ tabLayout }),
@@ -58,6 +63,7 @@ export const usePreferences = create<PreferencesState>()(
         presetId: state.presetId,
         linkedMemberId: state.linkedMemberId,
         linkedMemberPromptDone: state.linkedMemberPromptDone,
+        householdAdminMode: state.householdAdminMode,
       }),
       onRehydrateStorage: () => () => {
         usePreferences.setState({ hydrated: true });

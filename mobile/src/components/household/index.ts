@@ -3,6 +3,8 @@ export { BalanceSummaryTable } from './BalanceSummaryTable';
 export { BudgetProgressBar } from './BudgetProgressBar';
 export { CategoryBreakdown } from './CategoryBreakdown';
 export { ExpenseForm } from './ExpenseForm';
+export { ExpenseProofList } from './ExpenseProofList';
+export { HouseholdMembersSection } from './HouseholdMembersSection';
 export { MemberSegmentedControl, MemberToggleChips } from './MemberSegmentedControl';
 export { NetBalanceCard } from './NetBalanceCard';
 export { SettleUpModal } from './SettleUpModal';

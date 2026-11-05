@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { MemberSegmentedControl } from '../src/components/household';
+import { HouseholdMembersSection, MemberSegmentedControl } from '../src/components/household';
+import { hasSeenAdminHint, markAdminHintSeen } from '../src/features/household/adminHint';
+import { isHouseholdAdminEnvEnabled } from '../src/constants/householdAdmin';
 import { Screen } from '../src/components/layout/Screen';
 import { Avatar, CustomButton, CustomCard, SectionHeader, StatusPill } from '../src/components/ui';
 import { isClerkAuth } from '../src/features/auth/config';
@@ -22,13 +24,35 @@ export default function ProfileScreen() {
   const linkedMemberId = usePreferences((s) => s.linkedMemberId);
   const setLinkedMemberId = usePreferences((s) => s.setLinkedMemberId);
   const setPromptDone = usePreferences((s) => s.setLinkedMemberPromptDone);
+  const householdAdminMode = usePreferences((s) => s.householdAdminMode);
   const [signingOut, setSigningOut] = useState(false);
+  const [showAdminHint, setShowAdminHint] = useState(false);
   const [apiSync, setApiSync] = useState<'idle' | 'ok' | 'error'>('idle');
   const [apiSyncMessage, setApiSyncMessage] = useState<string | null>(null);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadMembers(true);
+    }, [loadMembers]),
+  );
+
   useEffect(() => {
-    void loadMembers();
-  }, [loadMembers]);
+    let cancelled = false;
+    void (async () => {
+      if (isHouseholdAdminEnvEnabled() || householdAdminMode) return;
+      const seen = await hasSeenAdminHint();
+      if (cancelled || seen) return;
+      if (members.length === 3) setShowAdminHint(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [members.length, householdAdminMode]);
+
+  async function dismissAdminHint() {
+    setShowAdminHint(false);
+    await markAdminHintSeen();
+  }
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -105,6 +129,11 @@ export default function ProfileScreen() {
                 ? (email ?? 'Signed in')
                 : 'Sign in from Settings to set your chat identity'}
             </Text>
+            {linked?.phone || linked?.email ? (
+              <Text style={[type.caption, { color: colors.muted }]} numberOfLines={2}>
+                {[linked.phone, linked.email].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
             <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
               <StatusPill
                 label={isSignedIn ? (isClerkAuth() ? 'Clerk account' : 'JWT account') : 'Guest'}
@@ -168,6 +197,17 @@ export default function ProfileScreen() {
           ) : null}
         </CustomCard>
       </View>
+
+      {showAdminHint ? (
+        <CustomCard>
+          <Text style={[type.body, { color: colors.text, fontSize: 14 }]}>
+            Enable admin mode below to add a 4th roommate (demo operator).
+          </Text>
+          <CustomButton label="Got it" variant="secondary" size="sm" onPress={() => void dismissAdminHint()} />
+        </CustomCard>
+      ) : null}
+
+      <HouseholdMembersSection variant="full" showProfileLink={false} showManageInfo />
 
       <View style={{ gap: spacing.sm }}>
         <CustomButton
