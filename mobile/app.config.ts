@@ -16,7 +16,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       supportsTablet: true,
       infoPlist: {
         NSCameraUsageDescription: 'The camera lab takes photos and scans QR codes.',
-        NSMicrophoneUsageDescription: 'The audio lab records a short clip.',
+        NSMicrophoneUsageDescription:
+          'GharSplit records your voice so the finance assistant can answer questions about expenses and balances.',
         NSPhotoLibraryUsageDescription: 'The camera lab lets you pick a photo.',
         NSLocationWhenInUseUsageDescription: 'The location lab shows where you are.',
       },
@@ -37,7 +38,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         'expo-camera',
         {
           cameraPermission: 'The camera lab takes photos and scans QR codes.',
-          microphonePermission: 'The audio lab records a short clip.',
+          microphonePermission:
+            'GharSplit records your voice so the finance assistant can answer questions about expenses and balances.',
           recordAudioAndroid: true,
         },
       ],

@@ -21,9 +21,14 @@ const GEMINI_URL =
 
 const TEXT_MODELS: Record<AiProviderName, string> = {
   gemini: 'gemini-2.5-flash',
-  groq: 'llama-3.3-70b-versatile',
+  groq: 'openai/gpt-oss-120b',
   openai: 'gpt-4o-mini',
 };
+
+function textModelForProvider(config: Config): string {
+  if (config.aiProvider === 'groq') return config.groqChatModel;
+  return TEXT_MODELS[config.aiProvider];
+}
 
 export function providerKey(config: Config = loadConfig()): string | undefined {
   if (config.aiProvider === 'groq') return config.groqApiKey;
@@ -50,7 +55,20 @@ function requireKey(): { config: Config; apiKey: string } {
 
 async function readError(response: Response): Promise<never> {
   const body = await response.text();
-  throw new AppError(502, 'AI_UPSTREAM', 'The AI provider returned an error.', {
+  let message = 'The AI provider returned an error.';
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } };
+    const upstream = parsed.error?.message;
+    if (upstream) {
+      message =
+        upstream.includes('model') && upstream.includes('not exist')
+          ? `${upstream} Set GROQ_CHAT_MODEL in backend env to an id from GET https://api.groq.com/openai/v1/models.`
+          : upstream;
+    }
+  } catch {
+    // keep default message
+  }
+  throw new AppError(502, 'AI_UPSTREAM', message, {
     status: response.status,
     body: body.slice(0, 400),
   });
@@ -70,6 +88,7 @@ async function openAiCompatibleChat(
     body: JSON.stringify({
       model,
       messages,
+      max_tokens: 2048,
       ...(json ? { response_format: { type: 'json_object' } } : {}),
     }),
   });
@@ -154,7 +173,7 @@ export async function generateText(prompt: string): Promise<string> {
   return openAiCompatibleChat(
     url,
     apiKey,
-    TEXT_MODELS[config.aiProvider],
+    textModelForProvider(config),
     [{ role: 'user', content: prompt }],
     false,
   );
@@ -172,7 +191,7 @@ export async function generateStructuredJSON(prompt: string, schemaHint: string 
   const text = await openAiCompatibleChat(
     url,
     apiKey,
-    TEXT_MODELS[config.aiProvider],
+    textModelForProvider(config),
     [
       { role: 'system', content: 'Return only valid JSON.' },
       { role: 'user', content: instruction },
@@ -258,5 +277,5 @@ export async function chatWithModel(messages: ChatMessage[]): Promise<string> {
     return gemini(apiKey, [{ text: transcript || 'Hello' }], false, system || undefined);
   }
   const url = config.aiProvider === 'groq' ? GROQ_CHAT_URL : OPENAI_CHAT_URL;
-  return openAiCompatibleChat(url, apiKey, TEXT_MODELS[config.aiProvider], messages, false);
+  return openAiCompatibleChat(url, apiKey, textModelForProvider(config), messages, false);
 }

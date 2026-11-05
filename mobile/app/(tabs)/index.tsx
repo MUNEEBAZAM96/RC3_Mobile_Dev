@@ -255,6 +255,12 @@ export default function HomeScreen() {
           onPress={() => router.push('/assistant')}
         />
         <ToolRow
+          icon="mic-outline"
+          title="Voice assistant"
+          body="Speak about expenses and splits"
+          onPress={() => router.push('/voice-coach')}
+        />
+        <ToolRow
           icon="pulse-outline"
           title="Flat feed"
           body="Everything logged on this phone"

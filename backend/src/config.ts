@@ -12,6 +12,8 @@ export interface Config {
   aiProvider: AiProviderName;
   geminiApiKey: string | undefined;
   groqApiKey: string | undefined;
+  /** Groq chat model id (see GET https://api.groq.com/openai/v1/models). */
+  groqChatModel: string;
   openaiApiKey: string | undefined;
   upliftApiKey: string | undefined;
   upliftVoiceId: string;
@@ -68,6 +70,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     aiProvider: providerName(emptyToUndefined(env.AI_PROVIDER)),
     geminiApiKey: emptyToUndefined(env.GEMINI_API_KEY),
     groqApiKey: emptyToUndefined(env.GROQ_API_KEY),
+    groqChatModel:
+      emptyToUndefined(env.GROQ_CHAT_MODEL) ?? 'openai/gpt-oss-120b',
     openaiApiKey: emptyToUndefined(env.OPENAI_API_KEY),
     upliftApiKey: emptyToUndefined(env.UPLIFT_API_KEY),
     upliftVoiceId: emptyToUndefined(env.UPLIFT_VOICE_ID) ?? 'v_8eelc901',

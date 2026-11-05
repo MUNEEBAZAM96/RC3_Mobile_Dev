@@ -15,6 +15,7 @@ import {
   transcribeAudio,
   type ChatMessage,
 } from './providers';
+import { hasUpliftKey, upliftTextToSpeech } from './uplift';
 
 const DEMO_TEXT =
   'Demo response. Add GEMINI_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY on the API server to call a real model. The key stays on the server.';
@@ -108,6 +109,15 @@ export function registerAi(app: FastifyInstance): void {
   app.post('/api/v1/ai/speech', async (request) => {
     await requireUser(request);
     const body = parseBody(SpeechBody, request.body);
+    if (hasUpliftKey()) {
+      const audio = await upliftTextToSpeech(body.text);
+      return {
+        demo: false,
+        provider: 'uplift',
+        audio_base64: audio.audioBase64,
+        mime_type: audio.mimeType,
+      };
+    }
     if (!hasAiKey()) mediaUnavailable();
     const audio = await textToSpeech(body.text);
     return { demo: false, provider: loadConfig().aiProvider, audio_base64: audio.audioBase64, mime_type: audio.mimeType };

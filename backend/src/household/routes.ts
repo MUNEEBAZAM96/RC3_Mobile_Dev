@@ -10,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { parseBody } from '../http/validate';
 import { buildBudgetSummary, computeBalances, totalHouseholdSpending } from './balances';
+import { checkoutTotalFromReceipt } from './money';
 import { splitCustom, splitEqual } from './split';
 import { validateSettlement } from './settle';
 import type { HouseholdStore } from './types';
@@ -41,7 +42,17 @@ export function registerHousehold(app: FastifyInstance, store: HouseholdStore): 
 
   app.post('/api/shopping/checkout', async (request, reply) => {
     const body = parseBody(checkoutSchema, request.body);
-    await store.checkout(body);
+    const amount = checkoutTotalFromReceipt(
+      body.total_paid,
+      body.tax_percent ?? 0,
+      body.discount_amount ?? 0,
+    );
+    await store.checkout({
+      item_ids: body.item_ids,
+      total_paid: amount,
+      payer_id: body.payer_id,
+      split_members: body.split_members,
+    });
     return reply.status(200).send({ ok: true });
   });
 
@@ -109,4 +120,8 @@ export function registerHousehold(app: FastifyInstance, store: HouseholdStore): 
       error: { code: 'NOT_IMPLEMENTED', message: 'Smart Settle will be added at hour 3.5.' },
     });
   });
+
+  app.get('/api/budget/categories', async () => ({ categories: [] }));
+
+  app.post('/api/expenses/recurring/apply', async () => ({ created: 0 }));
 }
