@@ -8,6 +8,7 @@ import { Screen } from '../src/components/layout/Screen';
 import { Avatar, CustomButton, CustomCard, SectionHeader, StatusPill } from '../src/components/ui';
 import { isClerkAuth } from '../src/features/auth/config';
 import { useSession } from '../src/features/auth/session';
+import { api } from '../src/services/api/client';
 import { useHouseholdStore } from '../src/store/household';
 import { usePreferences } from '../src/store/preferences';
 import { showToast } from '../src/store/toast';
@@ -22,10 +23,43 @@ export default function ProfileScreen() {
   const setLinkedMemberId = usePreferences((s) => s.setLinkedMemberId);
   const setPromptDone = usePreferences((s) => s.setLinkedMemberPromptDone);
   const [signingOut, setSigningOut] = useState(false);
+  const [apiSync, setApiSync] = useState<'idle' | 'ok' | 'error'>('idle');
+  const [apiSyncMessage, setApiSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void loadMembers();
   }, [loadMembers]);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      setApiSync('idle');
+      setApiSyncMessage(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        await api.me();
+        if (!cancelled) {
+          setApiSync('ok');
+          setApiSyncMessage('Synced with GET /api/v1/me.');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setApiSync('error');
+          setApiSyncMessage(
+            errorMessage(
+              err,
+              'Could not reach the API account. Check CLERK_SECRET_KEY on the server and Settings URL.',
+            ),
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn]);
 
   const email = claims?.email && claims.email.length > 0 ? claims.email : null;
   const linked = members.find((m) => m.id === linkedMemberId);
@@ -81,6 +115,20 @@ export default function ProfileScreen() {
                 <StatusPill label={linked.id} tone="success" size="sm" icon="link" />
               ) : null}
             </View>
+            {apiSyncMessage ? (
+              <Text
+                style={[
+                  type.caption,
+                  {
+                    color: apiSync === 'error' ? colors.danger : colors.muted,
+                    marginTop: 4,
+                  },
+                ]}
+                numberOfLines={3}
+              >
+                {apiSyncMessage}
+              </Text>
+            ) : null}
           </View>
         </View>
       </CustomCard>

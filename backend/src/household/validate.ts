@@ -13,6 +13,8 @@ export const checkoutSchema = z.object({
   total_paid: z.number().positive(),
   payer_id: z.string().min(1),
   split_members: z.array(z.string().min(1)).min(1),
+  tax_percent: z.number().nonnegative().optional(),
+  discount_amount: z.number().nonnegative().optional(),
 });
 
 export const expenseSchema = z

@@ -19,15 +19,10 @@ import {
   LoadingScreen,
   StatusPill,
 } from '../src/components/ui';
-import {
-  buildSystemPrompt,
-  fetchHouseholdSnapshot,
-  QUICK_PROMPTS,
-  type HouseholdSnapshot,
-} from '../src/features/assistant/context';
+import { fetchHouseholdSnapshot, QUICK_PROMPTS, type HouseholdSnapshot } from '../src/features/assistant/context';
 import { speak, stopSpeaking } from '../src/features/assistant/voice';
 import { useSession } from '../src/features/auth/session';
-import { chatWithAI } from '../src/services/ai';
+import { fetchApiHealth, householdCoachChat } from '../src/services/api/coach';
 import { ApiError } from '../src/services/api/client';
 import { useHouseholdStore } from '../src/store/household';
 import { usePreferences } from '../src/store/preferences';
@@ -41,10 +36,9 @@ const HEADER_HEIGHT_IOS = 64;
 
 function assistantErrorText(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.status === 401 || err.status === 403)
-      return 'Sign in to use the assistant. The AI route is protected on the server.';
     if (err.status === 0) return `${err.message} Then come back and ask again.`;
-    if (err.status === 503) return 'Could not reach AI. Check API keys on the server.';
+    if (err.status === 502 || err.status === 503)
+      return `Could not reach AI. ${err.message}`;
     return `Could not reach AI. ${err.message}`;
   }
   return `Could not reach AI. ${errorMessage(err, 'Check API keys on the server.')}`;
@@ -92,7 +86,7 @@ export default function AssistantScreen() {
   }, []);
 
   const send = useCallback(
-    async (rawText: string) => {
+    async (rawText: string, options?: { autoSpeak?: boolean }) => {
       const text = rawText.trim();
       if (!text || sending) return;
       setDraft('');
@@ -118,23 +112,45 @@ export default function AssistantScreen() {
             null,
           );
 
-        const system = buildSystemPrompt(live, { viewingMemberId: activeMemberId, linkedMemberId });
         const turns = history.filter((m) => !m.error).slice(-MAX_TURNS * 2);
-        const reply = await chatWithAI([
-          { role: 'system', content: system },
-          ...turns.map((m) => ({ role: m.role, content: m.text })),
-        ]);
+        const priorTurns = turns.slice(0, -1);
+        const rawMember = linkedMemberId ?? activeMemberId;
+        const memberId =
+          rawMember && live.members.some((m) => m.id === rawMember) ? rawMember : undefined;
+        const reply = await householdCoachChat({
+          message: text,
+          member_id: memberId,
+          history: priorTurns.map((m) => ({
+            role: m.role,
+            content: m.text,
+          })),
+        });
         setDemoMode(reply.demo);
+        const answerText = reply.text.trim() || 'I have nothing to add on that.';
+        const assistantId = createId('a');
         setMessages((prev) => [
           ...prev,
           {
-            id: createId('a'),
+            id: assistantId,
             role: 'assistant',
-            text: reply.text.trim() || 'I have nothing to add on that.',
+            text: answerText,
             createdAt: new Date().toISOString(),
             demo: reply.demo,
           },
         ]);
+        if (options?.autoSpeak && answerText.length > 0) {
+          const health = await fetchApiHealth().catch(() => null);
+          if (health?.ai?.uplift) {
+            setSpeakingId(assistantId);
+            try {
+              await speak(answerText);
+            } catch (speakErr) {
+              showToast(errorMessage(speakErr, 'Could not play voice reply.'), 'info');
+            } finally {
+              setSpeakingId((current) => (current === assistantId ? null : current));
+            }
+          }
+        }
       } catch (err) {
         setMessages((prev) => [
           ...prev,
@@ -186,13 +202,24 @@ export default function AssistantScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? HEADER_HEIGHT_IOS + insets.top : 0}
     >
-      <AssistantHeader
-        speakingTo={speakingTo}
-        fetchedAt={snapshot?.fetchedAt ?? null}
-        refreshing={refreshing}
-        onRefresh={() => void loadSnapshot()}
-        demoMode={demoMode}
-      />
+      <View style={{ gap: spacing.xs }}>
+        <AssistantHeader
+          speakingTo={speakingTo}
+          fetchedAt={snapshot?.fetchedAt ?? null}
+          refreshing={refreshing}
+          onRefresh={() => void loadSnapshot()}
+          demoMode={demoMode}
+        />
+        <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xs }}>
+          <CustomButton
+            label="Voice mode — talk about expenses"
+            size="sm"
+            variant="secondary"
+            icon="mic-outline"
+            onPress={() => router.push('/voice-coach')}
+          />
+        </View>
+      </View>
 
       <ChatMessageList
         ref={listRef}
@@ -225,10 +252,10 @@ export default function AssistantScreen() {
             {!isSignedIn ? (
               <CustomCard tone="soft">
                 <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-                  <Ionicons name="lock-closed-outline" size={18} color={colors.primary} />
+                  <Ionicons name="person-outline" size={18} color={colors.primary} />
                   <Text style={[type.body, { color: colors.text, flex: 1, fontSize: 14 }]}>
-                    The AI route needs an account. Sign in once; the ledger itself stays open to
-                    everyone.
+                    Sign in to sync your account on Profile. Chat uses the live ledger and does not
+                    require sign-in.
                   </Text>
                 </View>
                 <CustomButton
@@ -267,7 +294,7 @@ export default function AssistantScreen() {
             <EmptyState
               icon="chatbubble-ellipses-outline"
               title="Ask about your flat's spending and balances"
-              message="Answers come from the live ledger. Try a quick question below, type your own, or hold the mic."
+              message="Answers come from the live ledger. Type a question, tap the mic (tap again to send), or open Voice mode."
             />
           </View>
         }
@@ -294,7 +321,7 @@ export default function AssistantScreen() {
               <VoiceCoachButton
                 size={48}
                 disabled={sending}
-                onTranscript={(text) => void send(text)}
+                onTranscript={(text) => void send(text, { autoSpeak: true })}
                 onError={(message) => showToast(message, 'info')}
               />
             ) : null

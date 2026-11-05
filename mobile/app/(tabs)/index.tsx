@@ -268,13 +268,19 @@ export default function HomeScreen() {
       ) : null}
 
       {/* Quick actions */}
-      <Animated.View entering={enterRise(3)} style={{ flexDirection: 'row', gap: spacing.sm }}>
+      <Animated.View entering={enterRise(3)} style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
         <QuickAction
           icon="sparkles"
           title="Finance Assistant"
           body="Ask GharSplit AI about balances"
           onPress={() => router.push('/assistant')}
           accent
+        />
+        <QuickAction
+          icon="mic-outline"
+          title="Voice assistant"
+          body="Speak about expenses & splits"
+          onPress={() => router.push('/voice-coach')}
         />
         <QuickAction
           icon="pulse-outline"

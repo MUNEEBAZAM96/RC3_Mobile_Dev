@@ -28,8 +28,8 @@ interface VoiceCoachButtonProps {
 type Phase = 'idle' | 'recording' | 'transcribing';
 
 /**
- * Tap to record, tap again to stop. Audio is transcribed through the existing
- * POST /api/v1/ai/transcribe route; no provider SDK runs on the phone.
+ * Tap to record, tap again to stop. Transcription uses POST /api/v1/ai/household-coach/voice-in
+ * (Groq on the server); no provider SDK runs on the phone.
  */
 export function VoiceCoachButton({
   onTranscript,
@@ -82,9 +82,9 @@ export function VoiceCoachButton({
       onTranscript(text);
     } catch (err) {
       if (err instanceof ApiError && err.status === 503) {
-        onError('Voice needs a provider key on the API server. Text chat still works.');
+        onError('Voice needs GROQ_API_KEY on the API server. Text chat still works.');
       } else if (err instanceof ApiError && err.status === 401) {
-        onError('Sign in to use voice. The AI routes are protected on the server.');
+        onError('Transcription failed. Check the API URL in Settings.');
       } else {
         onError(errorMessage(err, 'Transcription failed.'));
       }

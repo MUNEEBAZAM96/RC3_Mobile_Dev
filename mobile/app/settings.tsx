@@ -85,7 +85,12 @@ export default function SettingsScreen() {
       setBudget(summary);
       setBudgetError(null);
     } catch (err) {
-      setError(errorMessage(err, 'Could not reach that address.'));
+      setError(
+        errorMessage(
+          err,
+          'Could not reach that address. Use http://127.0.0.1:8080 on the simulator, or your Mac LAN IP on a physical device (same Wi‑Fi, port 8080).',
+        ),
+      );
     } finally {
       setSaving(false);
     }

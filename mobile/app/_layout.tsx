@@ -82,6 +82,7 @@ function RootNavigator() {
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="assistant" options={{ title: 'Finance Assistant' }} />
+        <Stack.Screen name="voice-coach" options={{ title: 'Voice assistant' }} />
         <Stack.Screen name="household-feed" options={{ title: 'Flat feed' }} />
       </Stack.Protected>
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
