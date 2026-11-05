@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 
+import { registerHouseholdCoach } from './ai/coachRoutes';
 import { registerAi } from './ai/routes';
 import { registerHealth } from './api/health';
 import { registerPing } from './api/ping';
@@ -31,6 +32,7 @@ export async function buildApp(users: UserStore, household: HouseholdStore): Pro
   registerAuth(app, users);
   registerAi(app);
   registerHousehold(app, household);
+  registerHouseholdCoach(app, household);
 
   return app;
 }

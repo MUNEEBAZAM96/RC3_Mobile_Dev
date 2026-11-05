@@ -2,7 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - '5432:5432'
+      # Host 5433 avoids conflict with a local Postgres on 5432 (Homebrew, Postgres.app, etc.)
+      - '5433:5432'
     environment:
       POSTGRES_USER: hackathon
       POSTGRES_PASSWORD: hackathon
