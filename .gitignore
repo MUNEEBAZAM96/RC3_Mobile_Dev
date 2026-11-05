@@ -8,3 +8,4 @@ dist/
 ._*
 mobile/release/
 coverage/
+backend/data/

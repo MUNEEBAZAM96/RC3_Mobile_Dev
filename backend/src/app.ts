@@ -8,11 +8,13 @@ import { registerAuth } from './auth/routes';
 import { loadConfig } from './config';
 import { registerErrorHandling, registerJsonParser } from './http/errors';
 import { registerRateLimit } from './http/rateLimit';
+import { registerHousehold } from './household/routes';
+import type { HouseholdStore } from './household/types';
 import type { UserStore } from './users/store';
 
 export const BODY_LIMIT_BYTES = 8 * 1024 * 1024;
 
-export async function buildApp(users: UserStore): Promise<FastifyInstance> {
+export async function buildApp(users: UserStore, household: HouseholdStore): Promise<FastifyInstance> {
   const app = Fastify({
     logger: { level: loadConfig().logLevel },
     bodyLimit: BODY_LIMIT_BYTES,
@@ -24,10 +26,11 @@ export async function buildApp(users: UserStore): Promise<FastifyInstance> {
   registerJsonParser(app);
   registerRateLimit(app);
 
-  registerHealth(app, users);
+  registerHealth(app, users, household);
   registerPing(app);
   registerAuth(app, users);
   registerAi(app);
+  registerHousehold(app, household);
 
   return app;
 }

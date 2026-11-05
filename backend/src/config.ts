@@ -7,6 +7,8 @@ export interface Config {
   jwtSecret: string;
   clerkSecretKey: string | undefined;
   databaseUrl: string | undefined;
+  /** Local SQLite file for household data when DATABASE_URL is unset */
+  householdSqlitePath: string;
   aiProvider: AiProviderName;
   geminiApiKey: string | undefined;
   groqApiKey: string | undefined;
@@ -47,6 +49,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwtSecret: env.JWT_SECRET || 'dev-jwt-secret',
     clerkSecretKey,
     databaseUrl: emptyToUndefined(env.DATABASE_URL),
+    householdSqlitePath:
+      emptyToUndefined(env.HOUSEHOLD_SQLITE_PATH) ??
+      `${process.cwd()}/data/household.sqlite`,
     aiProvider: providerName(emptyToUndefined(env.AI_PROVIDER)),
     geminiApiKey: emptyToUndefined(env.GEMINI_API_KEY),
     groqApiKey: emptyToUndefined(env.GROQ_API_KEY),
