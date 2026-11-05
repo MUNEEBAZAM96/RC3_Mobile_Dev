@@ -3,6 +3,9 @@ export type ShoppingUnit = (typeof SHOPPING_UNITS)[number];
 
 export type ShoppingItemStatus = 'pending' | 'bought';
 
+export const EXPENSE_CATEGORIES = ['Groceries', 'Utilities', 'Entertainment', 'Cleaning'] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
 export interface Member {
   id: string;
   name: string;
@@ -45,6 +48,9 @@ export interface CheckoutPayload {
   total_paid: number;
   payer_id: string;
   split_members: string[];
+  /** Hour 3.5 (Option 2): optional receipt adjustments. Sent only when entered. */
+  tax_percent?: number;
+  discount_amount?: number;
 }
 
 export type SplitType = 'equal' | 'custom';
@@ -64,12 +70,34 @@ export interface CreateExpensePayload {
   split_members?: string[];
   splits?: ExpenseSplitInput[];
   date?: string;
+  /** Hour 3.5 (Option 4): mark as a monthly recurring template. */
+  is_recurring?: boolean;
 }
 
 export interface SettlePayload {
   sender_id: string;
   recipient_id: string;
   amount: number;
+}
+
+/** Hour 3.5 (Option 1): one transfer suggested by GET /api/balances/simplify. */
+export interface SettlementSuggestion {
+  sender_id: string;
+  recipient_id: string;
+  amount: number;
+}
+
+/** Hour 3.5 (Option 3): one row from GET /api/budget/categories. */
+export interface CategorySpending {
+  category: string;
+  total: number;
+  percent_of_budget: number;
+  exceeded: boolean;
+}
+
+/** Hour 3.5 (Option 4): result of POST /api/expenses/recurring/apply. */
+export interface RecurringApplyResult {
+  created: number;
 }
 
 export const DEFAULT_MONTHLY_BUDGET_PKR = 5000;

@@ -1,8 +1,10 @@
 export { BalanceSummaryTable } from './BalanceSummaryTable';
 export { BudgetProgressBar } from './BudgetProgressBar';
+export { CategoryBreakdown } from './CategoryBreakdown';
 export { ExpenseForm } from './ExpenseForm';
-export { MemberSegmentedControl } from './MemberSegmentedControl';
+export { MemberSegmentedControl, MemberToggleChips } from './MemberSegmentedControl';
 export { NetBalanceCard } from './NetBalanceCard';
 export { SettleUpModal } from './SettleUpModal';
 export { ShoppingCheckoutSheet } from './ShoppingCheckoutSheet';
 export { ShoppingItemRow } from './ShoppingItemRow';
+export { SmartSettleCard } from './SmartSettleCard';

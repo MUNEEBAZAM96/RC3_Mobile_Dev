@@ -2,7 +2,7 @@ export { AuthDivider } from './AuthDivider';
 export { AppHeader } from './AppHeader';
 export { ListRow } from './ListRow';
 export { SectionHeader } from './SectionHeader';
-export { StatusPill, TransactionTrailing } from './StatusPill';
+export { StatusPill, TransactionTrailing, type PillTone } from './StatusPill';
 export { Avatar } from './Avatar';
 export { BottomSheet } from './BottomSheet';
 export { CustomButton } from './CustomButton';

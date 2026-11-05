@@ -1,20 +1,55 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 
-import { useTheme } from '../../theme';
+import { useTheme, type ThemeColors } from '../../theme';
+
+export type PillTone = 'success' | 'neutral' | 'danger' | 'warning' | 'primary';
 
 interface StatusPillProps {
   label: string;
-  tone?: 'success' | 'neutral' | 'danger';
+  tone?: PillTone;
+  icon?: keyof typeof Ionicons.glyphMap;
+  size?: 'sm' | 'md';
 }
 
-export function StatusPill({ label, tone = 'success' }: StatusPillProps) {
+function toneColors(colors: ThemeColors, tone: PillTone): { background: string; text: string } {
+  switch (tone) {
+    case 'success':
+      return { background: colors.successSoft, text: colors.success };
+    case 'danger':
+      return { background: colors.dangerSoft, text: colors.danger };
+    case 'warning':
+      return { background: colors.warningSoft, text: colors.warning };
+    case 'primary':
+      return { background: colors.primarySoft, text: colors.primary };
+    default:
+      return { background: colors.surface, text: colors.muted };
+  }
+}
+
+/** Compact status chip with a soft tinted background, readable in light and dark. */
+export function StatusPill({ label, tone = 'neutral', icon, size = 'md' }: StatusPillProps) {
   const { colors, type, radius } = useTheme();
-  const color = tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : colors.muted;
+  const palette = toneColors(colors, tone);
+  const compact = size === 'sm';
 
   return (
-    <View style={{ alignItems: 'flex-end', gap: 2 }}>
-      <Text style={[type.label, { color: colors.text }]}>{label.split(' ')[0]}</Text>
-      <Text style={[type.caption, { color }]}>{label.includes(' ') ? label.split(' ').slice(1).join(' ') : label}</Text>
+    <View
+      accessibilityRole="text"
+      accessibilityLabel={label}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 4,
+        paddingHorizontal: compact ? 8 : 10,
+        paddingVertical: compact ? 3 : 5,
+        borderRadius: radius.full,
+        backgroundColor: palette.background,
+      }}
+    >
+      {icon ? <Ionicons name={icon} size={compact ? 11 : 13} color={palette.text} /> : null}
+      <Text style={[compact ? type.caption : type.label, { color: palette.text }]}>{label}</Text>
     </View>
   );
 }

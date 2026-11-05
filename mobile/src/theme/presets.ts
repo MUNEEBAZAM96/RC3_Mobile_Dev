@@ -1,4 +1,4 @@
-import type { ThemeColors } from './tokens';
+import { withSoftTokens, type ThemeColors } from './tokens';
 
 export interface ThemePreset {
   id: string;
@@ -18,22 +18,27 @@ export const themePresets: Record<string, ThemePreset> = {
     id: 'fintech',
     label: 'FinTech',
     light: {
-      text: '#111827',
-      muted: '#6B7280',
-      background: '#F5F5F5',
+      text: '#0F172A',
+      muted: '#64748B',
+      background: '#F3F6F4',
       card: '#FFFFFF',
-      surface: '#F9FAFB',
-      border: '#E5E7EB',
-      primary: '#00B060',
+      surface: '#EEF3F0',
+      border: '#E2E8E4',
+      primary: '#00A35A',
       primaryText: '#FFFFFF',
-      hero: '#00B060',
-      tabActive: '#00B060',
+      hero: '#064E3B',
+      tabActive: '#00A35A',
       danger: '#DC2626',
-      success: '#00B060',
+      success: '#059669',
       warning: '#B45309',
-      online: '#00B060',
+      online: '#059669',
       offline: '#DC2626',
       syncing: '#B45309',
+      primarySoft: '#DDF5E8',
+      successSoft: '#DCFCE7',
+      warningSoft: '#FEF3C7',
+      dangerSoft: '#FEE2E2',
+      heroText: '#ECFDF5',
     },
     dark: {
       text: '#F3F4F6',
@@ -44,18 +49,23 @@ export const themePresets: Record<string, ThemePreset> = {
       border: '#2D3532',
       primary: '#34D399',
       primaryText: '#052E1C',
-      hero: '#059669',
+      hero: '#065F46',
       tabActive: '#34D399',
       danger: '#FCA5A5',
       success: '#34D399',
       warning: '#FCD34D',
       ...baseDarkExtras,
+      primarySoft: '#123528',
+      successSoft: '#0F3B2C',
+      warningSoft: '#3D2E0B',
+      dangerSoft: '#3F1D1D',
+      heroText: '#ECFDF5',
     },
   },
   modernSaas: {
     id: 'modernSaas',
     label: 'Modern SaaS',
-    light: {
+    light: withSoftTokens({
       text: '#0F172A',
       muted: '#64748B',
       background: '#F8FAFC',
@@ -72,8 +82,8 @@ export const themePresets: Record<string, ThemePreset> = {
       online: '#16A34A',
       offline: '#DC2626',
       syncing: '#B45309',
-    },
-    dark: {
+    }),
+    dark: withSoftTokens({
       text: '#F8FAFC',
       muted: '#94A3B8',
       background: '#0F172A',
@@ -88,12 +98,12 @@ export const themePresets: Record<string, ThemePreset> = {
       success: '#4ADE80',
       warning: '#FCD34D',
       ...baseDarkExtras,
-    },
+    }),
   },
   aiDark: {
     id: 'aiDark',
     label: 'AI / Futuristic',
-    light: {
+    light: withSoftTokens({
       text: '#1E1B4B',
       muted: '#6366F1',
       background: '#EEF2FF',
@@ -110,8 +120,8 @@ export const themePresets: Record<string, ThemePreset> = {
       online: '#059669',
       offline: '#DC2626',
       syncing: '#D97706',
-    },
-    dark: {
+    }),
+    dark: withSoftTokens({
       text: '#EDE9FE',
       muted: '#A78BFA',
       background: '#0C0A14',
@@ -126,12 +136,12 @@ export const themePresets: Record<string, ThemePreset> = {
       success: '#6EE7B7',
       warning: '#FCD34D',
       ...baseDarkExtras,
-    },
+    }),
   },
   warmMinimal: {
     id: 'warmMinimal',
     label: 'Warm Minimal',
-    light: {
+    light: withSoftTokens({
       text: '#292524',
       muted: '#78716C',
       background: '#FAF7F2',
@@ -148,8 +158,8 @@ export const themePresets: Record<string, ThemePreset> = {
       online: '#16A34A',
       offline: '#DC2626',
       syncing: '#CA8A04',
-    },
-    dark: {
+    }),
+    dark: withSoftTokens({
       text: '#FAFAF9',
       muted: '#A8A29E',
       background: '#1C1917',
@@ -164,12 +174,12 @@ export const themePresets: Record<string, ThemePreset> = {
       success: '#4ADE80',
       warning: '#FCD34D',
       ...baseDarkExtras,
-    },
+    }),
   },
   wellness: {
     id: 'wellness',
     label: 'Health / Wellness',
-    light: {
+    light: withSoftTokens({
       text: '#134E4A',
       muted: '#5EEAD4',
       background: '#F0FDFA',
@@ -186,8 +196,8 @@ export const themePresets: Record<string, ThemePreset> = {
       online: '#059669',
       offline: '#DC2626',
       syncing: '#D97706',
-    },
-    dark: {
+    }),
+    dark: withSoftTokens({
       text: '#ECFEFF',
       muted: '#5EEAD4',
       background: '#042F2E',
@@ -202,7 +212,7 @@ export const themePresets: Record<string, ThemePreset> = {
       success: '#6EE7B7',
       warning: '#FCD34D',
       ...baseDarkExtras,
-    },
+    }),
   },
 };
 
