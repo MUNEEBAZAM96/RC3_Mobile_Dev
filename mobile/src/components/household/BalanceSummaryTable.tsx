@@ -1,13 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { CustomCard, EmptyState } from '../ui';
 import { useTheme } from '../../theme';
 import type { BalanceRow, Member } from '../../types/household';
 import { formatPkr } from '../../utils/currency';
 import { initials } from '../../utils/format';
-import { enterRise, layoutSpring } from './motion';
 
 interface BalanceSummaryTableProps {
   balances: BalanceRow[];
@@ -72,10 +70,8 @@ export function BalanceSummaryTable({
         const netColor = sign > 0 ? colors.success : sign < 0 ? colors.danger : colors.muted;
         const active = row.member_id === activeMemberId;
         return (
-          <Animated.View
+          <View
             key={row.member_id}
-            entering={enterRise(index)}
-            layout={layoutSpring}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -138,7 +134,7 @@ export function BalanceSummaryTable({
               {sign > 0 ? '+' : ''}
               {formatPkr(row.net_balance).replace('PKR ', '')}
             </Text>
-          </Animated.View>
+          </View>
         );
       })}
 

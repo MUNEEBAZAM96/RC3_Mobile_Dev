@@ -8,6 +8,7 @@ import { CustomButton, InputField, StatusPill } from '../ui';
 import { expenseSchema } from '../../features/household/schemas';
 import { householdApi } from '../../services/api/household';
 import { pushEvent } from '../../store/activityFeed';
+import { clampDueDay, upsertRecurringTemplate } from '../../store/recurringSchedule';
 import { showToast } from '../../store/toast';
 import { useTheme } from '../../theme';
 import { EXPENSE_CATEGORIES, type Member, type SplitType } from '../../types/household';
@@ -137,6 +138,17 @@ export function ExpenseForm({ members, onSuccess }: ExpenseFormProps) {
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const payerName = members.find((m) => m.id === data.payer_id)?.name;
+      if (data.is_recurring) {
+        // The API ignores is_recurring today; remember the due day locally so the calendar can show it.
+        const dueDay = Number(data.date.slice(-2));
+        upsertRecurringTemplate({
+          title: data.title,
+          amount: data.amount,
+          payerName: payerName ?? data.payer_id,
+          payerId: data.payer_id,
+          dayOfMonth: clampDueDay(dueDay),
+        });
+      }
       pushEvent({
         type: 'expense',
         title: `${data.title} · ${data.category}${data.is_recurring ? ' · monthly' : ''}`,

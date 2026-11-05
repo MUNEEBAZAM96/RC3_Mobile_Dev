@@ -38,10 +38,7 @@ export function ShoppingItemRow({
         minHeight: minTapTarget + 8,
         paddingVertical: spacing.sm,
         paddingHorizontal: spacing.md,
-        borderRadius: radius.lg,
-        borderWidth: 1.5,
-        borderColor: selected ? colors.primary : colors.border,
-        backgroundColor: selected ? colors.primarySoft : colors.card,
+        backgroundColor: selected ? colors.primarySoft : 'transparent',
       }}
     >
       {interactive ? (

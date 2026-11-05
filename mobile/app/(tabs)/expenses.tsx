@@ -1,8 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import {
   BalanceSummaryTable,
@@ -10,7 +8,6 @@ import {
   SettleUpModal,
   SmartSettleCard,
 } from '../../src/components/household';
-import { enterRise } from '../../src/components/household/motion';
 import { Screen } from '../../src/components/layout/Screen';
 import {
   AppHeader,
@@ -28,7 +25,7 @@ import { formatPkr } from '../../src/utils/currency';
 import { errorMessage } from '../../src/utils/format';
 
 export default function ExpensesScreen() {
-  const { colors, spacing, type, radius } = useTheme();
+  const { colors, spacing, type } = useTheme();
   const { members, activeMemberId, loadMembers } = useHouseholdStore();
   const [balances, setBalances] = useState<BalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,29 +75,20 @@ export default function ExpensesScreen() {
           void load();
         }}
       >
-        <AppHeader
-          title="Expenses"
-          subtitle="Log bills, see who owes whom, settle up"
-          right={
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: radius.full,
-                backgroundColor: colors.primarySoft,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="wallet" size={22} color={colors.primary} />
-            </View>
-          }
-        />
+        <AppHeader title="Expenses" subtitle="Log bills, see who owes whom, settle up" />
         {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-        {/* Summary strip */}
-        <Animated.View entering={enterRise(0)} style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <CustomCard style={{ flex: 1 }}>
+        {/* Summary line */}
+        <View
+          style={{
+            flexDirection: 'row',
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingVertical: spacing.sm,
+          }}
+        >
+          <View style={{ flex: 1, gap: 2 }}>
             <Text style={[type.caption, { color: colors.muted }]}>TOTAL SPENT</Text>
             <Text
               style={[type.heading, { color: colors.text, fontSize: 18 }]}
@@ -109,8 +97,11 @@ export default function ExpensesScreen() {
             >
               {formatPkr(totalSpending)}
             </Text>
-          </CustomCard>
-          <CustomCard style={{ flex: 1 }} tone={allSettled ? 'soft' : 'default'}>
+          </View>
+          <View
+            style={{ width: 1, backgroundColor: colors.border, marginHorizontal: spacing.md }}
+          />
+          <View style={{ flex: 1, gap: 2 }}>
             <Text style={[type.caption, { color: colors.muted }]}>OPEN DEBTS</Text>
             <Text
               style={[
@@ -123,11 +114,11 @@ export default function ExpensesScreen() {
             >
               {allSettled ? 'All square' : `${openDebts} member${openDebts === 1 ? '' : 's'}`}
             </Text>
-          </CustomCard>
-        </Animated.View>
+          </View>
+        </View>
 
         {/* Ledger */}
-        <Animated.View entering={enterRise(1)} style={{ gap: spacing.sm }}>
+        <View style={{ gap: spacing.sm }}>
           <SectionHeader title="Household balances" />
           <BalanceSummaryTable
             balances={balances}
@@ -140,20 +131,16 @@ export default function ExpensesScreen() {
             onPress={() => setSettleOpen(true)}
             disabled={members.length < 2}
           />
-        </Animated.View>
+        </View>
 
         {/* Hour 3.5 (Option 1) */}
-        <Animated.View entering={enterRise(2)}>
-          <SmartSettleCard members={members} onSettled={() => void load()} />
-        </Animated.View>
+        <SmartSettleCard members={members} onSettled={() => void load()} />
 
         {/* Log expense */}
-        <Animated.View entering={enterRise(3)}>
-          <CustomCard>
-            <SectionHeader title="Log shared expense" />
-            <ExpenseForm members={members} onSuccess={() => void load()} />
-          </CustomCard>
-        </Animated.View>
+        <CustomCard>
+          <SectionHeader title="Log shared expense" />
+          <ExpenseForm members={members} onSuccess={() => void load()} />
+        </CustomCard>
       </Screen>
 
       <SettleUpModal

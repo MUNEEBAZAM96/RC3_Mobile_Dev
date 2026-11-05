@@ -1,12 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { CustomCard, EmptyState, StatusPill } from '../ui';
 import { useTheme } from '../../theme';
 import type { CategorySpending } from '../../types/household';
 import { formatPkr } from '../../utils/currency';
-import { enterRise, layoutSpring } from './motion';
 
 interface CategoryBreakdownProps {
   categories: CategorySpending[];
@@ -75,12 +73,7 @@ export function CategoryBreakdown({
             const icon = CATEGORY_ICON[c.category.toLowerCase()] ?? 'pricetag-outline';
             const accent = c.exceeded ? colors.warning : colors.primary;
             return (
-              <Animated.View
-                key={c.category}
-                entering={enterRise(index)}
-                layout={layoutSpring}
-                style={{ gap: 6 }}
-              >
+              <View key={c.category} style={{ gap: 6 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <View
                     style={{
@@ -134,7 +127,7 @@ export function CategoryBreakdown({
                     />
                   </View>
                 ) : null}
-              </Animated.View>
+              </View>
             );
           })}
         </View>

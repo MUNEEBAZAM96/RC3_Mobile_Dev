@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { useTheme } from '../../theme';
 import type { Member } from '../../types/household';
 import { initials } from '../../utils/format';
-import { layoutSpring } from './motion';
 
 interface MemberChipProps {
   member: Member;
@@ -79,8 +77,7 @@ export function MemberSegmentedControl({
 }: MemberSegmentedControlProps) {
   const { spacing } = useTheme();
   return (
-    <Animated.View
-      layout={layoutSpring}
+    <View
       accessibilityRole="radiogroup"
       style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}
     >
@@ -93,7 +90,7 @@ export function MemberSegmentedControl({
           compact={compact}
         />
       ))}
-    </Animated.View>
+    </View>
   );
 }
 

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { CustomButton, CustomCard, EmptyState, StatusPill } from '../ui';
 import { householdApi, isUnavailable } from '../../services/api/household';
@@ -11,7 +10,6 @@ import { useTheme } from '../../theme';
 import type { Member, SettlementSuggestion } from '../../types/household';
 import { formatPkr } from '../../utils/currency';
 import { errorMessage, initials } from '../../utils/format';
-import { enterRise, layoutSpring } from './motion';
 
 interface SmartSettleCardProps {
   members: Member[];
@@ -172,10 +170,8 @@ export function SmartSettleCard({ members, onSettled }: SmartSettleCardProps) {
               const busy = settlingKey === key;
               const done = doneKeys.has(key);
               return (
-                <Animated.View
+                <View
                   key={key}
-                  entering={enterRise(index)}
-                  layout={layoutSpring}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -216,7 +212,7 @@ export function SmartSettleCard({ members, onSettled }: SmartSettleCardProps) {
                       disabled={settlingKey !== null}
                     />
                   )}
-                </Animated.View>
+                </View>
               );
             })
           )}
